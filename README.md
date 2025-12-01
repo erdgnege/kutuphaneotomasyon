@@ -13,7 +13,7 @@ This project adheres to a Decoupled Architecture, separating the presentation la
 | **Frontend** | **ReactJS** | Component-based library for building the dynamic and responsive user interface. |
 | **Backend** | **Java (Spring Boot)** | Highly scalable framework used to develop the secure and robust RESTful API. |
 | **Communication** | **RESTful API (JSON)** | Standard protocol for data exchange between the client and server. |
-| **Database** | **[Your Database: e.g., PostgreSQL, MySQL, MongoDB]** | Manages persistent application data. |
+| **Database** | **MSSQL** | Manages persistent application data. |
 | **Build Tools** | **npm/Yarn (Frontend) & Maven/Gradle (Backend)** | Dependency management and build automation for both services. |
 
 ## 🛠️ Local Setup and Running
