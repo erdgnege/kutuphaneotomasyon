@@ -1,0 +1,2 @@
+- [ ] Add import for java.util.Optional in UyeController.java
+- [ ] Fix uyeGuncelleme method: rename to uyeGuncelle, use service instead of repository, correct variable references, improve logic to throw exception instead of returning null
