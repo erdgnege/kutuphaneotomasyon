@@ -1,45 +1,45 @@
 package com.kutuphane.otomasyon.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 
-@Entity // Bu sınıfın bir JPA varlığı (Entity) olduğunu belirtir.
-@Table(name = "kitaplar") // Veritabanındaki tablo adını belirtir.
+@Entity
+@Table(name = "kitaplar")
 public class Kitap {
 
-    @Id // Birincil anahtar (Primary Key) olduğunu belirtir.
-    @GeneratedValue(strategy = GenerationType.IDENTITY) // ID'nin veritabanı tarafından otomatik artırılmasını sağlar.
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank(message = "Başlık boş olamaz") // API çağrılarında (JSON) alanın boş bırakılamayacağını kontrol eder
-                                             // (Validasyon).
-    @Column(nullable = false) // Veritabanı seviyesinde de zorunlu (NOT NULL) olduğunu belirtir.
+    @NotBlank(message = "Kitap adı boş olamaz")
+    @Column(nullable = false)
     private String baslik;
 
-    @NotBlank(message = "Yazar boş olamaz")
-    @Column(nullable = false) // NOT NULL
+    @NotBlank(message = "Yazar adı boş olamaz")
+    @Column(nullable = false)
     private String yazar;
 
-    @NotBlank(message = "ISBN boş olamaz")
-    @Column(unique = true, nullable = false) // ISBN'nin hem benzersiz (UNIQUE) hem de zorunlu (NOT NULL) olduğunu
-                                             // belirtir.
+    @NotBlank(message = "ISBN alanı zorunludur")
+    @Column(unique = true, nullable = false)
     private String isbn;
 
-    // primitive 'boolean' olduğu için zaten null olamaz. JPA bunu "BIT" veya
-    // "BOOLEAN" olarak saklar.
-    private boolean mevcut = true; // Kitabın rafta olup olmadığını tutar. Varsayılan değer: true
+    @Column(name = "kapak_url", length = 500, nullable = true)
+    private String kapakUrl; // Kitap kapağı URL'i (Google Books'tan)
 
-    // JPA/Hibernate'in veri çekerken nesne oluşturması için gerekli boş
-    // constructor.
+    private boolean mevcut = true; // Kitap kütüphanede mi?
+
+    // Boş constructor (JPA için gerekli)
     public Kitap() {
     }
 
-    // --- Getter ve Setter Metotları (Kapsülleme) ---
+    // Parametreli constructor (Kod yazarken işimizi kolaylaştırır aga)
+    public Kitap(String baslik, String yazar, String isbn) {
+        this.baslik = baslik;
+        this.yazar = yazar;
+        this.isbn = isbn;
+    }
+
+    // --- Getter ve Setterlar ---
 
     public Long getId() {
         return id;
@@ -73,11 +73,19 @@ public class Kitap {
         this.isbn = isbn;
     }
 
-    public boolean isMevcut() { // Boolean için 'is' önekli getter metodu (Java kuralı)
+    public boolean isMevcut() {
         return mevcut;
     }
 
     public void setMevcut(boolean mevcut) {
         this.mevcut = mevcut;
+    }
+
+    public String getKapakUrl() {
+        return kapakUrl;
+    }
+
+    public void setKapakUrl(String kapakUrl) {
+        this.kapakUrl = kapakUrl;
     }
 }

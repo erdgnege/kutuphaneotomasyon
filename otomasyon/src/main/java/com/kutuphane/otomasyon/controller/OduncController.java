@@ -5,56 +5,88 @@ import com.kutuphane.otomasyon.service.OduncService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
-/**
- * Ödünç alma ve iade işlemleri ile ilgili HTTP isteklerini yöneten REST
- * denetleyicisi. Bu, Kitap ve Kullanıcı arasındaki ilişkiyi yönetir.
- */
 @RestController
-@RequestMapping("/api/odunc") // Bu denetleyiciye gelen tüm istekler "/api/odunc" yolu ile başlar.
+@RequestMapping("/api/odunc")
 public class OduncController {
 
-    private final OduncService oduncService; // İş mantığı servisini tutan alan
+    private final OduncService oduncService;
 
-    /**
-     * Gerekli servisleri enjekte etmek için kullanılan kurucu metot (Constructor
-     * Injection).
-     */
     public OduncController(OduncService oduncService) {
         this.oduncService = oduncService;
     }
 
-    /**
-     * Bir kullanıcıya bir kitap ödünç verme işlemini gerçekleştirir.
-     * HTTP Metodu: POST /api/odunc/ver?kitapId=...&userId=...
-     * * @param kitapId Ödünç verilecek kitabın Query Parametresi ile alınan ID'si.
-     * 
-     * @param kullaniciId Kitabı ödünç alacak kullanıcının Query Parametresi ile
-     *                    alınan ID'si.
-     * @return Oluşturulan yeni Odunc kaydı ve HTTP 201 (Created) durum kodu.
+    /*
+     * POST: http://localhost:8080/api/odunc/ver?kitapId=1&userId=2
+     * Bu işlem RequestBody değil, RequestParam kullanır kanka.
+     * Postman'de 'Params' kısmına kitapId ve userId ekleyeceksin.
      */
     @PostMapping("/ver")
     public ResponseEntity<Odunc> kitapOduncVer(
-            @RequestParam Long kitapId, // URL'deki Query Parametresi 'kitapId' alınır
-            @RequestParam("userId") Long kullaniciId) { // URL'deki Query Parametresi 'userId' alınır
+            @RequestParam Long kitapId,
+            @RequestParam Long userId) {
 
-        // Servis, iş kurallarını (limit kontrolü, stok azaltma) uygular
-        Odunc yeniOdunc = oduncService.kitapOduncVer(kullaniciId, kitapId);
-        return new ResponseEntity<>(yeniOdunc, HttpStatus.CREATED);
+        return new ResponseEntity<>(oduncService.kitapOduncVer(userId, kitapId), HttpStatus.CREATED);
     }
 
-    /**
-     * Bir ödünç kaydını sonlandırarak kitabın iade edilmesini sağlar.
-     * HTTP Metodu: PUT /api/odunc/iade/{oduncId}
-     * * @param oduncId İade edilecek kaydın URL'den alınan (PathVariable) ID'si.
-     * 
-     * @return Güncellenmiş (iade tarihi eklenmiş) ödünç kaydı ve HTTP 200 (OK).
+    /*
+     * PUT: http://localhost:8080/api/odunc/iade/1
+     * {id} yerine ödünç işleminin ID'sini yazıyorsun brom.
      */
     @PutMapping("/iade/{oduncId}")
     public ResponseEntity<Odunc> kitapIadeAl(@PathVariable Long oduncId) {
-        // Servis, iade işlemini (stok arttırma, kayıt sonlandırma) uygular
-        Odunc iadeEdilen = oduncService.kitapIadeAl(oduncId);
-        return ResponseEntity.ok(iadeEdilen);
+        return ResponseEntity.ok(oduncService.kitapIadeAl(oduncId));
     }
 
+    /*
+     * GET: http://localhost:8080/api/odunc/aktif
+     * Tüm aktif (iade edilmemiş) ödünç kayıtlarını getirir.
+     */
+    @GetMapping("/aktif")
+    public List<Odunc> aktifOduncleriGetir() {
+        return oduncService.tumAktifOduncleriGetir();
+    }
+
+    /*
+     * GET: http://localhost:8080/api/odunc
+     * Tüm ödünç kayıtlarını getirir (aktif ve iade edilmiş).
+     */
+    @GetMapping
+    public List<Odunc> tumOduncleriGetir() {
+        return oduncService.tumOduncleriGetir();
+    }
+
+    /*
+     * GET: http://localhost:8080/api/odunc/kullanici/{userId}
+     * Belirli bir kullanıcının aktif ödünç kayıtlarını getirir.
+     */
+    @GetMapping("/kullanici/{userId}")
+    public List<Odunc> kullaniciOduncleriGetir(@PathVariable Long userId) {
+        return oduncService.kullaniciOduncleriGetir(userId);
+    }
+
+    /*
+     * POST: http://localhost:8080/api/odunc/kullanici-iste?kitapId=1&userId=2
+     * Kullanıcıların kendi adına kitap ödünç istemesi için endpoint.
+     */
+    @PostMapping("/kullanici-iste")
+    public ResponseEntity<Odunc> kullaniciKitapOduncIste(
+            @RequestParam Long kitapId,
+            @RequestParam Long userId) {
+        // Bildirim oluşturma işlemi OduncService içinde yapılıyor (transaction içinde)
+        Odunc odunc = oduncService.kitapOduncVer(userId, kitapId, true);
+        return new ResponseEntity<>(odunc, HttpStatus.CREATED);
+    }
+
+    /*
+     * PUT: http://localhost:8080/api/odunc/kullanici-iade/{oduncId}
+     * Kullanıcıların kendi ödünçlerini iade etmesi için endpoint.
+     */
+    @PutMapping("/kullanici-iade/{oduncId}")
+    public ResponseEntity<Odunc> kullaniciKitapIadeEt(@PathVariable Long oduncId) {
+        // Bildirim oluşturma işlemi OduncService içinde yapılıyor (transaction içinde)
+        Odunc oduncKaydi = oduncService.kitapIadeAl(oduncId, true);
+        return ResponseEntity.ok(oduncKaydi);
+    }
 }

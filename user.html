@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kütüphane - Kullanıcı Paneli</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .header-section {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .book-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .book-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .status-badge {
+            font-size: 0.85rem;
+            padding: 0.35rem 0.75rem;
+        }
+        .loading-spinner {
+            display: none;
+        }
+        .loading-spinner.active {
+            display: inline-block;
+        }
+        .user-info-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .book-card.odunc-te {
+            background-color: #6c757d;
+            color: #ffffff;
+            opacity: 0.8;
+        }
+        .book-card.odunc-te .card-title,
+        .book-card.odunc-te .text-muted {
+            color: #ffffff !important;
+        }
+        .book-card.odunc-te:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header-section">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="mb-0"><i class="bi bi-person-circle"></i> Kullanıcı Paneli</h1>
+                    <p class="mb-0 mt-2">Ödünç aldığınız kitaplar ve kütüphane kataloğu</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="dropdown me-2" id="userInfoDropdown" style="display: none !important;">
+                        <button class="btn btn-outline-light dropdown-toggle" type="button" id="userInfoDropdownButton" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-person-circle"></i> Kullanıcı Bilgileri
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userInfoDropdownButton" style="min-width: 300px;">
+                            <li>
+                                <div class="px-3 py-2">
+                                    <h6 class="mb-2"><i class="bi bi-person"></i> <span id="dropdownUserName"></span></h6>
+                                    <p class="mb-1 small text-muted"><i class="bi bi-envelope"></i> <span id="dropdownUserEmail"></span></p>
+                                    <p class="mb-1 small text-muted"><i class="bi bi-telephone"></i> <span id="dropdownUserPhone"></span></p>
+                                    <p class="mb-0 small"><i class="bi bi-book"></i> <span id="dropdownUserLimit"></span></p>
+                                </div>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <button class="dropdown-item" onclick="showUpdateUserInfoModal()">
+                                    <i class="bi bi-pencil-square"></i> Bilgilerimi Güncelle
+                                </button>
+                            </li>
+                            <li>
+                                <button class="dropdown-item text-danger" onclick="userLogout()">
+                                    <i class="bi bi-box-arrow-right"></i> Çıkış Yap
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                    <button class="btn btn-outline-light me-2" id="userLoginButton" onclick="showUserLoginModal()" style="display: inline-block;">
+                        <i class="bi bi-box-arrow-in-right"></i> Kullanıcı Girişi
+                    </button>
+                    <a href="index.html" class="btn btn-outline-light me-2" onclick="switchToAdminPage(event)">
+                        <i class="bi bi-shield-check"></i> Admin Paneli
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kullanıcı Giriş Modal (body'nin direkt altında olmalı) -->
+    <div class="modal fade" id="userLoginModal" tabindex="-1" aria-labelledby="userLoginModalLabel" aria-hidden="true" data-bs-backdrop="true" data-bs-keyboard="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="userLoginModalLabel">
+                            <i class="bi bi-person-circle"></i> Kullanıcı Girişi
+                        </h5>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="uyeNoInput" class="form-label">Üye Numarası</label>
+                            <input type="text" class="form-control" id="uyeNoInput" placeholder="6 haneli üye numaranızı giriniz" required maxlength="6" pattern="[0-9]{6}">
+                            <small class="form-text text-muted">Kayıt olurken seçtiğiniz 6 haneli üye numaranız</small>
+                        </div>
+                        <div class="mb-3">
+                            <label for="userEmailOrPhoneInput" class="form-label">E-posta veya Telefon</label>
+                            <input type="text" class="form-control" id="userEmailOrPhoneInput" placeholder="E-posta adresinizi veya telefon numaranızı giriniz" required onkeypress="if(event.key === 'Enter') verifyUserLogin()">
+                            <small class="form-text text-muted">Doğrulama için e-posta adresinizi veya telefon numaranızı giriniz</small>
+                        </div>
+                        <div id="userLoginAlert" class="alert d-none" role="alert"></div>
+                    </div>
+                    <div class="modal-footer d-flex flex-column">
+                        <button type="button" class="btn btn-primary w-100 mb-2" onclick="verifyUserLogin()" id="loginBtn">
+                            <span class="spinner-border spinner-border-sm loading-spinner" role="status" aria-hidden="true"></span>
+                            Giriş Yap
+                        </button>
+                        <div class="text-center w-100 mb-2">
+                            <a href="register.html" class="text-decoration-none">
+                                <small class="text-muted" style="cursor: pointer;">Üye Değil Misiniz?</small>
+                            </a>
+                        </div>
+                        <div class="text-center w-100">
+                            <a href="index.html" class="btn btn-outline-secondary btn-sm" onclick="switchToAdminPage(event)">
+                                <i class="bi bi-shield-check"></i> Admin Paneli
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    <!-- Kullanıcı Bilgilerini Güncelleme Modal -->
+    <div class="modal fade" id="updateUserInfoModal" tabindex="-1" aria-labelledby="updateUserInfoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="updateUserInfoModalLabel">
+                        <i class="bi bi-pencil-square"></i> Bilgilerimi Güncelle
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="updateUserInfoForm">
+                        <div class="mb-3">
+                            <label for="updateAdSoyad" class="form-label">Ad Soyad</label>
+                            <input type="text" class="form-control" id="updateAdSoyad" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="updateEmail" class="form-label">E-posta</label>
+                            <input type="email" class="form-control" id="updateEmail" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="updateTelefon" class="form-label">Telefon</label>
+                            <input type="text" class="form-control" id="updateTelefon" placeholder="05XX XXX XX XX" maxlength="11">
+                        </div>
+                        <div id="updateUyeNoContainer" class="mb-3" style="display: none;">
+                            <label class="form-label">Üye Numarası</label>
+                            <input type="text" class="form-control" id="updateUyeNoDisplay" readonly disabled>
+                            <small class="form-text text-muted">Üye numarası değiştirilemez</small>
+                        </div>
+                        <div id="updateUserInfoAlert" class="alert d-none" role="alert"></div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="button" class="btn btn-primary" onclick="updateUserInfo()" id="updateUserInfoBtn">
+                        <span class="spinner-border spinner-border-sm loading-spinner" role="status" aria-hidden="true"></span>
+                        Güncelle
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container" id="mainUserContent" style="display: none;">
+        <!-- Kullanıcı Bilgileri Kartı -->
+        <div class="row mb-4" id="userInfoCard" style="display: none;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title mb-2">
+                                    <i class="bi bi-person-circle"></i> <span id="userName"></span>
+                                </h5>
+                                <p class="text-muted mb-1" id="userEmail"></p>
+                                <small id="userLimit"></small>
+                            </div>
+                            <button class="btn btn-outline-danger" onclick="userLogout()">
+                                <i class="bi bi-box-arrow-right"></i> Çıkış Yap
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert Container -->
+        <div id="alertContainer"></div>
+
+        <!-- Navigation Tabs -->
+        <ul class="nav nav-tabs mb-4" id="userTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="my-loans-tab" data-bs-toggle="tab" data-bs-target="#my-loans" type="button" role="tab">
+                    <i class="bi bi-bookmark-heart"></i> Ödünç Aldığım Kitaplar
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="catalog-tab" data-bs-toggle="tab" data-bs-target="#catalog" type="button" role="tab">
+                    <i class="bi bi-book"></i> Kütüphane Kataloğu
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="userTabContent">
+            <!-- Ödünç Aldığım Kitaplar Tab -->
+            <div class="tab-pane fade show active" id="my-loans" role="tabpanel">
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="bi bi-bookmark-heart"></i> Ödünç Aldığım Kitaplar</h5>
+                                <span class="badge bg-primary" id="myLoansCount">0 kitap</span>
+                            </div>
+                            <div class="card-body">
+                                <div id="loadingMyLoans" class="text-center py-5">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Yükleniyor...</span>
+                                    </div>
+                                    <p class="mt-3 text-muted">Ödünç kayıtlarınız yükleniyor...</p>
+                                </div>
+                                <div id="myLoansContainer" style="display: none;">
+                                    <!-- Ödünç kayıtları buraya eklenecek -->
+                                </div>
+                                <div id="noMyLoansMessage" class="text-center py-5" style="display: none;">
+                                    <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
+                                    <p class="mt-3 text-muted">Henüz ödünç aldığınız kitap bulunmamaktadır.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kütüphane Kataloğu Tab -->
+            <div class="tab-pane fade" id="catalog" role="tabpanel">
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="bi bi-list-ul"></i> Kütüphane Kataloğu</h5>
+                                <span class="badge bg-primary" id="catalogCount">0 kitap</span>
+                            </div>
+                            <div class="card-body">
+                                <div id="loadingCatalog" class="text-center py-5">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Yükleniyor...</span>
+                                    </div>
+                                    <p class="mt-3 text-muted">Kitaplar yükleniyor...</p>
+                                </div>
+                                <div id="catalogContainer" class="row g-3" style="display: none;">
+                                    <!-- Kitaplar buraya eklenecek -->
+                                </div>
+                                <div id="noCatalogMessage" class="text-center py-5" style="display: none;">
+                                    <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
+                                    <p class="mt-3 text-muted">Henüz kitap bulunmamaktadır.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="user-script.js"></script>
+</body>
+</html>
+

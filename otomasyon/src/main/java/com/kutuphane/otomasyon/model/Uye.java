@@ -1,56 +1,32 @@
 package com.kutuphane.otomasyon.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.DiscriminatorValue;
-import jakarta.persistence.Entity;
+import jakarta.persistence.*;
 
-// Kullanici sınıfından Kalıtım (Inheritance) alır.
-@Entity // Bu sınıfın bir JPA varlığı (Entity) olduğunu belirtir.
-// SINGLE_TABLE kalıtım stratejisinde, bu değer veritabanındaki kayıt tipini
-// ayırt etmek için kullanılır.
+@Entity
 @DiscriminatorValue("UYE")
 public class Uye extends Kullanici {
 
-    @Column(unique = true, nullable = true) // Benzersiz (UNIQUE) olabilir, ancak Personel kayıtları için NULL
-                                            // geçilebilir.
-    private String uyeNo; // Üye için özgün bir numara (Opsiyonel)
+    @Column(unique = true, length = 6, nullable = false)
+    private String uyeNo;
 
-    // JPA/Hibernate'in veri çekerken nesne oluşturması için gerekli boş
-    // constructor.
+    // Boş constructor
     public Uye() {
         super();
     }
 
-    /**
-     * Alanları ayarlayan parametreli constructor.
-     * 
-     * @param uyeNo Uye sınıfına özgü alan.
-     */
+    // Bilgileri hızlıca girmek için constructor
     public Uye(String adSoyad, String email, String uyeNo) {
-        // Üst sınıfın zorunlu alanlarını (adSoyad, email) atamak için super() çağrısı
-        // yapılır.
         super(adSoyad, email);
-
-        // DİKKAT: Üst sınıftan gelen alanlara (adSoyad, email) tekrar setter çağrılması
-        // genellikle gereksizdir
-        // ve üst sınıfın constructor'ının işini tekrarlar. Sadece super() yeterlidir.
-
-        // Kendi (alt sınıf) alanına atama.
         this.uyeNo = uyeNo;
     }
 
-    // --- Polimorfizm Uygulaması ---
-
-    /**
-     * Polimorfizm için zorunlu metot.
-     * Üst sınıftaki abstract metodu override ederek Üyeye özgü limiti tanımlar.
-     */
+    // Üye için ödünç limiti (Polimorfizm)
     @Override
     public int oduncAlmaLimitiHesapla() {
-        return 3; // Üyelerin limiti
+        return 3;
     }
 
-    // --- Getter ve Setter Metotları (Kapsülleme) ---
+    // --- Getter ve Setter ---
 
     public String getUyeNo() {
         return uyeNo;

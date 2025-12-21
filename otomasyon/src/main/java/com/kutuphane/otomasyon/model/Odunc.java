@@ -1,57 +1,45 @@
 package com.kutuphane.otomasyon.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import java.time.LocalDate;
-
+import jakarta.persistence.*;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.time.LocalDate;
 
-/**
- * Bir kitabın bir kullanıcı tarafından ödünç alınması işlemini temsil eden JPA
- * varlığı. Bu sınıf, Kitap ve Kullanici entity'leri arasında ManyToOne ilişkiyi
- * tanımlar.
- */
-@Entity // Bu sınıfın bir JPA varlığı (Entity) olduğunu belirtir.
-@Table(name = "oduncler") // Veritabanındaki tablo adını belirtir.
+@Entity
+@Table(name = "oduncler")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Odunc {
 
-    @Id // Birincil anahtar (Primary Key) olduğunu belirtir.
-    @GeneratedValue(strategy = GenerationType.IDENTITY) // ID'nin DB tarafından otomatik artırılmasını sağlar.
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Bir ödünç kaydı sadece bir kitaba aittir (ManyToOne ilişki).
     @ManyToOne
-    @JoinColumn(name = "kitap_id") // Bu tablodaki yabancı anahtar sütununun adı
-    // OnDelete: İlişkili Kitap silindiğinde bu Odunc kaydının da silinmesini sağlar
-    // (CASCADE).
-    @OnDelete(action = OnDeleteAction.CASCADE)
+    @JoinColumn(name = "kitap_id", referencedColumnName = "id", foreignKey = @ForeignKey(name = "FK_odunc_kitap"))
+    @OnDelete(action = OnDeleteAction.CASCADE) // Kitap silinirse kayıt da silinsin
     private Kitap kitap;
 
-    // Bir ödünç kaydı sadece bir kullanıcıya aittir (ManyToOne ilişki).
-    @ManyToOne
-    @JoinColumn(name = "kullanici_id") // Bu tablodaki yabancı anahtar sütununun adı
-    // OnDelete: İlişkili Kullanici silindiğinde bu Odunc kaydının da silinmesini
-    // sağlar (CASCADE).
-    @OnDelete(action = OnDeleteAction.CASCADE)
+    @ManyToOne(fetch = FetchType.EAGER) // Lazy loading sorununu önlemek için EAGER yapıyoruz
+    @JoinColumn(name = "kullanici_id", referencedColumnName = "id", 
+                foreignKey = @ForeignKey(value = ConstraintMode.NO_CONSTRAINT))
+    @OnDelete(action = OnDeleteAction.CASCADE) // Kullanıcı silinirse kayıt da silinsin
     private Kullanici kullanici;
 
-    // Ödünç alma tarihi, kayıt oluşturulduğunda varsayılan olarak o günün tarihi
-    // ayarlanır.
     private LocalDate oduncTarihi = LocalDate.now();
-    private LocalDate teslimTarihi; // Kitabın ne zaman iade edildiği (NULL ise henüz iade edilmemiş demektir).
+    private LocalDate teslimTarihi;
 
-    // JPA/Hibernate'in veri çekerken nesne oluşturması için gerekli boş
-    // constructor.
+    // Boş Constructor
     public Odunc() {
     }
 
-    // --- Getter ve Setter Metotları (Kapsülleme) ---
+    // Kolaylık olması için parametreli constructor
+    public Odunc(Kitap kitap, Kullanici kullanici) {
+        this.kitap = kitap;
+        this.kullanici = kullanici;
+    }
+
+    // --- Getter ve Setterlar ---
 
     public Long getId() {
         return id;
@@ -92,5 +80,4 @@ public class Odunc {
     public void setTeslimTarihi(LocalDate teslimTarihi) {
         this.teslimTarihi = teslimTarihi;
     }
-
 }

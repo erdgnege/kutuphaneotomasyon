@@ -1,188 +1,258 @@
 package com.kutuphane.otomasyon.controller;
 
-import com.kutuphane.otomasyon.exception.KaynakBulunamadiException;
-import com.kutuphane.otomasyon.model.Personel;
-import com.kutuphane.otomasyon.model.Kullanici; // Temel soyut sınıf
-import com.kutuphane.otomasyon.model.Uye;
+import com.kutuphane.otomasyon.model.*;
 import com.kutuphane.otomasyon.service.KullaniciService;
+import com.kutuphane.otomasyon.service.EmailVerificationService;
+import com.kutuphane.otomasyon.exception.KutuphaneHatasi;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 
-/**
- * Kullanıcı (Üye ve Personel) varlıkları ile ilgili HTTP isteklerini yöneten
- * REST denetleyicisi. Polimorfizm prensibini kullanır.
- */
 @RestController
-@RequestMapping("/api/kullanicilar") // Tüm isteklere ön ek olarak eklenir
+@RequestMapping("/api/kullanicilar")
 public class KullaniciController {
 
-    private final KullaniciService kullaniciService; // İş mantığı servisini tutan alan
+    private final KullaniciService kullaniciService;
+    private final EmailVerificationService emailVerificationService;
+    private final com.kutuphane.otomasyon.service.BildirimService bildirimService;
 
-    /**
-     * Gerekli servisleri enjekte etmek için kullanılan kurucu metot (Constructor
-     * Injection).
-     */
-    public KullaniciController(KullaniciService kullaniciService) {
+    public KullaniciController(KullaniciService kullaniciService,
+            EmailVerificationService emailVerificationService,
+            com.kutuphane.otomasyon.service.BildirimService bildirimService) {
         this.kullaniciService = kullaniciService;
+        this.emailVerificationService = emailVerificationService;
+        this.bildirimService = bildirimService;
     }
 
-    /**
-     * Sisteme yeni bir üye ekler. POST /api/kullanicilar/uye
-     * 
-     * @param uye Gövdeden gelen Uye nesnesi.
-     * @return Oluşturulan üye ve HTTP 201 (Created).
-     */
-    @PostMapping("/uye")
-    public ResponseEntity<Uye> uyeEkle(@RequestBody Uye uye) {
-        Uye yeniUye = kullaniciService.kullaniciEkle(uye); // Servis, Uye'yi Kullanici olarak kaydeder (Polimorfizm)
-        return new ResponseEntity<>(yeniUye, HttpStatus.CREATED);
-    }
+    // --- LİSTELEME İŞLEMLERİ ---
 
-    /**
-     * Sisteme yeni bir personel ekler. POST /api/kullanicilar/personel
-     * 
-     * @param personel Gövdeden gelen Personel nesnesi.
-     * @return Oluşturulan personel ve HTTP 201 (Created).
-     */
-    @PostMapping("/personel")
-    public ResponseEntity<Personel> personelEkle(@RequestBody Personel personel) {
-        Personel yeniPersonel = kullaniciService.kullaniciEkle(personel); // Servis, Personel'i Kullanici olarak
-                                                                          // kaydeder
-        return new ResponseEntity<>(yeniPersonel, HttpStatus.CREATED);
-    }
-
-    /**
-     * Sistemdeki tüm kullanıcıları (Üye ve Personel) listeler. GET
-     * /api/kullanicilar
-     * 
-     * @return Tüm Kullanici tiplerinin listesi (Polimorfik dönüş).
-     */
     @GetMapping
-    public ResponseEntity<List<Kullanici>> tumKullanicilariGetir() {
-        List<Kullanici> kullanicilar = kullaniciService.tumKullanicilariGetir();
-        return ResponseEntity.ok(kullanicilar);
+    public List<Kullanici> tumKullanicilariGetir() {
+        return kullaniciService.tumKullanicilariGetir();
     }
 
-    /**
-     * Sistemdeki sadece üyeleri listeler. GET /api/kullanicilar/uyeler
-     * 
-     * @return Tüm Uye nesnelerinin listesi.
+    /*
+     * GET: http://localhost:8080/api/kullanicilar/uyeler
+     * Sadece Üye (Uye) tipindeki kullanıcıları listeler.
      */
     @GetMapping("/uyeler")
-    public ResponseEntity<List<Uye>> tumUyeleriGetir() {
-        List<Uye> uyeler = kullaniciService.tumUyeleriGetir();
-        return ResponseEntity.ok(uyeler);
+    public List<Uye> tumUyeleriGetir() {
+        return kullaniciService.tumUyeleriGetir();
     }
 
-    /**
-     * Sistemdeki sadece personelleri listeler. GET /api/kullanicilar/personeller
-     * 
-     * @return Tüm Personel nesnelerinin listesi.
+    /*
+     * GET: http://localhost:8080/api/kullanicilar/personeller
+     * Sadece Personel (Personel) tipindeki kullanıcıları listeler.
      */
     @GetMapping("/personeller")
-    public ResponseEntity<List<Personel>> tumPersonelleriGetir() {
-        List<Personel> personeller = kullaniciService.tumPersonelleriGetir();
-        return ResponseEntity.ok(personeller);
+    public List<Personel> tumPersonelleriGetir() {
+        return kullaniciService.tumPersonelleriGetir();
     }
 
-    /**
-     * Belirtilen ID'ye sahip kullanıcıyı getirir. GET /api/kullanicilar/{id}
-     * 
-     * @param id Aranacak kullanıcının ID'si.
-     * @return Bulunan Kullanici nesnesi (Uye veya Personel olabilir).
-     */
     @GetMapping("/{id}")
-    public ResponseEntity<Kullanici> kullaniciBul(@PathVariable Long id) {
-        // Servis ile ID'ye göre arama yapılır, bulunamazsa 404 fırlatılır.
-        Kullanici kullanici = kullaniciService.kullaniciBulById(id)
-                .orElseThrow(() -> new KaynakBulunamadiException("ID: " + id + " numaralı kullanıcı bulunamadı."));
-        return ResponseEntity.ok(kullanici);
+    public Kullanici kullaniciBul(@PathVariable Long id) {
+        return kullaniciService.kullaniciBulById(id);
     }
 
-    // --- KULLANICI GÜNCELLEME VE SİLME ---
+    @GetMapping("/uye-no/{uyeNo}")
+    public Uye uyeBulByUyeNo(@PathVariable String uyeNo) {
+        return kullaniciService.uyeBulByUyeNo(uyeNo);
+    }
 
-    /**
-     * Ortak alanları günceller. PUT /api/kullanicilar/{id}
-     * Not: Özel alt sınıf alanlarını güncellemek için DTO veya özel endpoint
-     * gerekir.
-     */
-    // otomasyon/controller/KullaniciController.java - Eklenecek Metot
+    // --- E-POSTA DOĞRULAMA İŞLEMLERİ ---
 
-    /**
-     * Bir üyeyi ID'si ile bulup, sadece Üye alanlarını günceller.
-     * PUT /api/kullanicilar/uye/{id}
-     */
+    @PostMapping("/email/kod-gonder")
+    public ResponseEntity<Map<String, String>> kodGonder(@RequestBody Map<String, String> request) {
+        try {
+            String email = request.get("email");
+            if (email == null || email.trim().isEmpty()) {
+                throw new KutuphaneHatasi("E-posta adresi gereklidir.");
+            }
+
+            // E-posta format kontrolü
+            if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+                throw new KutuphaneHatasi("Geçerli bir e-posta adresi giriniz.");
+            }
+
+            // Kod oluştur ve gönder
+            emailVerificationService.generateAndSendCode(email);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Doğrulama kodu e-posta adresinize gönderildi. Lütfen e-postanızı kontrol ediniz.",
+                    "email", email));
+        } catch (Exception e) {
+            // E-posta gönderme hatası olsa bile kod oluşturuldu, kullanıcıya bilgi ver
+            System.err.println("E-posta gönderme hatası (kod yine de oluşturuldu): " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.ok(Map.of(
+                    "message",
+                    "Doğrulama kodu oluşturuldu. E-posta gönderilemediyse backend console'unu kontrol ediniz.",
+                    "email", request.get("email")));
+        }
+    }
+
+    @PostMapping("/email/kod-dogrula")
+    public ResponseEntity<Map<String, String>> kodDogrula(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        String code = request.get("code");
+
+        if (email == null || email.trim().isEmpty()) {
+            throw new KutuphaneHatasi("E-posta adresi gereklidir.");
+        }
+
+        if (code == null || code.trim().isEmpty()) {
+            throw new KutuphaneHatasi("Doğrulama kodu gereklidir.");
+        }
+
+        boolean isValid = emailVerificationService.verifyCode(email, code);
+
+        if (isValid) {
+            return ResponseEntity.ok(Map.of("message", "E-posta doğrulandı.", "verified", "true"));
+        } else {
+            throw new KutuphaneHatasi("Doğrulama kodu geçersiz veya süresi dolmuş.");
+        }
+    }
+
+    // --- KAYIT İŞLEMLERİ ---
+
+    @PostMapping("/uye")
+    public ResponseEntity<Kullanici> uyeEkle(@RequestBody Uye uye) {
+        // E-posta doğrulaması kontrolü
+        if (!emailVerificationService.hasCode(uye.getEmail())) {
+            throw new KutuphaneHatasi("Lütfen önce e-posta adresinizi doğrulayın.");
+        }
+
+        // Kayıt işlemi
+        Kullanici kaydedilenKullanici = kullaniciService.kullaniciKaydet(uye);
+
+        // Kayıt başarılı oldu, doğrulama kodunu temizle
+        emailVerificationService.clearCode(uye.getEmail());
+
+        return new ResponseEntity<>(kaydedilenKullanici, HttpStatus.CREATED);
+    }
+
+    @PostMapping("/personel")
+    public ResponseEntity<Kullanici> personelEkle(@RequestBody Personel personel) {
+        return new ResponseEntity<>(kullaniciService.kullaniciKaydet(personel), HttpStatus.CREATED);
+    }
+
+    // --- GÜNCELLEME İŞLEMLERİ (instanceof Kullanımı) ---
+
     @PutMapping("/uye/{id}")
-    public ResponseEntity<Uye> uyeGuncelle(@PathVariable Long id, @RequestBody Uye guncelUye) {
-        Uye uye = kullaniciService.kullaniciBulById(id)
-                .map(mevcutUser -> {
-                    if (!(mevcutUser instanceof Uye)) {
-                        // Eğer bulunan kullanıcı Üye değilse, hata fırlat.
-                        throw new KaynakBulunamadiException("ID: " + id + " numaralı kayıt bir Üye değil.");
-                    }
+    public Kullanici uyeGuncelle(@PathVariable Long id, @RequestBody Uye guncelUye) {
+        Kullanici k = kullaniciService.kullaniciBulById(id);
 
-                    Uye mevcutUye = (Uye) mevcutUser;
-                    // Ortak alanları güncelle (Kullanici.java'dan miras)
-                    mevcutUye.setAdSoyad(guncelUye.getAdSoyad());
-                    mevcutUye.setEmail(guncelUye.getEmail());
-                    mevcutUye.setTelefon(guncelUye.getTelefon());
+        if (!(k instanceof Uye)) {
+            throw new KutuphaneHatasi("Hata: Belirtilen ID bir Üye kaydına ait değil!");
+        }
 
-                    // Uye'ye özgü alanları güncelle (Uye.java'dan)
-                    mevcutUye.setUyeNo(guncelUye.getUyeNo());
+        Uye mevcutUye = (Uye) k;
+        mevcutUye.setAdSoyad(guncelUye.getAdSoyad());
+        mevcutUye.setEmail(guncelUye.getEmail());
+        mevcutUye.setTelefon(guncelUye.getTelefon());
+        mevcutUye.setUyeNo(guncelUye.getUyeNo());
 
-                    return kullaniciService.kullaniciEkle(mevcutUye);
-                })
-                .orElseThrow(() -> new KaynakBulunamadiException("ID: " + id + " numaralı kullanıcı bulunamadı."));
-
-        return ResponseEntity.ok((Uye) uye);
+        return kullaniciService.kullaniciKaydet(mevcutUye);
     }
-    // otomasyon/controller/KullaniciController.java - Eklenecek Metot
 
-    /**
-     * Bir personeli ID'si ile bulup, sadece Personel alanlarını günceller.
-     * PUT /api/kullanicilar/personel/{id}
-     */
     @PutMapping("/personel/{id}")
-    public ResponseEntity<Personel> personelGuncelle(@PathVariable Long id, @RequestBody Personel guncelPersonel) {
-        Personel personel = kullaniciService.kullaniciBulById(id)
-                .map(mevcutUser -> {
-                    if (!(mevcutUser instanceof Personel)) {
-                        // Eğer bulunan kullanıcı Personel değilse, hata fırlat.
-                        throw new KaynakBulunamadiException("ID: " + id + " numaralı kayıt bir Personel değil.");
-                    }
+    public Kullanici personelGuncelle(@PathVariable Long id, @RequestBody Personel guncelPersonel) {
+        Kullanici k = kullaniciService.kullaniciBulById(id);
 
-                    Personel mevcutPersonel = (Personel) mevcutUser;
-                    // Ortak alanları güncelle (Kullanici.java'dan miras)
-                    mevcutPersonel.setAdSoyad(guncelPersonel.getAdSoyad());
-                    mevcutPersonel.setEmail(guncelPersonel.getEmail());
-                    mevcutPersonel.setTelefon(guncelPersonel.getTelefon());
+        if (!(k instanceof Personel)) {
+            throw new KutuphaneHatasi("Hata: Belirtilen ID bir Personel kaydına ait değil!");
+        }
 
-                    // Personel'e özgü alanları güncelle (Personel.java'dan)
-                    mevcutPersonel.setSicilNo(guncelPersonel.getSicilNo());
-                    mevcutPersonel.setDepartman(guncelPersonel.getDepartman());
+        Personel mevcutPersonel = (Personel) k;
+        mevcutPersonel.setAdSoyad(guncelPersonel.getAdSoyad());
+        mevcutPersonel.setSicilNo(guncelPersonel.getSicilNo());
+        mevcutPersonel.setDepartman(guncelPersonel.getDepartman());
 
-                    return kullaniciService.kullaniciEkle(mevcutPersonel);
-                })
-                .orElseThrow(() -> new KaynakBulunamadiException("ID: " + id + " numaralı kullanıcı bulunamadı."));
-
-        return ResponseEntity.ok((Personel) personel);
+        return kullaniciService.kullaniciKaydet(mevcutPersonel);
     }
 
-    /**
-     * Belirtilen ID'ye sahip kullanıcıyı sistemden siler. DELETE
-     * /api/kullanicilar/{id}
-     * 
-     * @param id Silinecek kullanıcının ID'si.
-     * @return HTTP 204 (No Content) durum kodu.
-     */
+    // Kullanıcının kendi bilgilerini güncellemesi için endpoint
+    @PutMapping("/kendi-bilgilerim/{id}")
+    public ResponseEntity<Kullanici> kendiBilgilerimiGuncelle(@PathVariable Long id,
+            @RequestBody Kullanici guncelBilgiler) {
+        Kullanici mevcutKullanici = kullaniciService.kullaniciBulById(id);
+
+        // Değişiklikleri takip et
+        StringBuilder degisiklikler = new StringBuilder();
+        boolean degisiklikVar = false;
+
+        if (!mevcutKullanici.getAdSoyad().equals(guncelBilgiler.getAdSoyad())) {
+            degisiklikler.append("Ad Soyad: '").append(mevcutKullanici.getAdSoyad())
+                    .append("' → '").append(guncelBilgiler.getAdSoyad()).append("'");
+            degisiklikVar = true;
+        }
+
+        if (!mevcutKullanici.getEmail().equals(guncelBilgiler.getEmail())) {
+            if (degisiklikVar)
+                degisiklikler.append(", ");
+            degisiklikler.append("E-posta: '").append(mevcutKullanici.getEmail())
+                    .append("' → '").append(guncelBilgiler.getEmail()).append("'");
+            degisiklikVar = true;
+        }
+
+        String eskiTelefon = mevcutKullanici.getTelefon() != null ? mevcutKullanici.getTelefon() : "";
+        String yeniTelefon = guncelBilgiler.getTelefon() != null ? guncelBilgiler.getTelefon() : "";
+        if (!eskiTelefon.equals(yeniTelefon)) {
+            if (degisiklikVar)
+                degisiklikler.append(", ");
+            degisiklikler.append("Telefon: '").append(eskiTelefon.isEmpty() ? "Yok" : eskiTelefon)
+                    .append("' → '").append(yeniTelefon.isEmpty() ? "Yok" : yeniTelefon).append("'");
+            degisiklikVar = true;
+        }
+
+        // Sadece ad, email ve telefon güncellenebilir (üye numarası değiştirilemez)
+        mevcutKullanici.setAdSoyad(guncelBilgiler.getAdSoyad());
+        mevcutKullanici.setEmail(guncelBilgiler.getEmail());
+        mevcutKullanici.setTelefon(guncelBilgiler.getTelefon());
+
+        // Üye numarası değiştirilemez - sabit kalır
+
+        Kullanici guncellenmisKullanici = kullaniciService.kullaniciKaydet(mevcutKullanici);
+
+        // Eğer değişiklik varsa bildirim oluştur
+        if (degisiklikVar) {
+            String mesaj = mevcutKullanici.getAdSoyad() + " kullanıcısı bilgilerini güncelledi: "
+                    + degisiklikler.toString();
+            bildirimService.bildirimOlustur(id, mevcutKullanici.getAdSoyad(), mesaj);
+        }
+
+        return new ResponseEntity<>(guncellenmisKullanici, HttpStatus.OK);
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> kullaniciSil(@PathVariable Long id) {
-        // Silme işleminden önce varlık kontrolü yapılır.
-        kullaniciService.kullaniciBulById(id)
-                .orElseThrow(() -> new KaynakBulunamadiException("ID: " + id + " numaralı kullanıcı bulunamadı."));
         kullaniciService.kullaniciSil(id);
         return ResponseEntity.noContent().build();
+    }
+
+    // --- BİLDİRİM İŞLEMLERİ ---
+
+    @GetMapping("/bildirimler")
+    public List<com.kutuphane.otomasyon.model.Bildirim> tumBildirimleriGetir() {
+        return bildirimService.tumBildirimleriGetir();
+    }
+
+    @GetMapping("/bildirimler/okunmamis-sayisi")
+    public ResponseEntity<Map<String, Long>> okunmamisBildirimSayisi() {
+        return ResponseEntity.ok(Map.of("sayi", bildirimService.okunmamisBildirimSayisi()));
+    }
+
+    @PutMapping("/bildirimler/{id}/okundu")
+    public ResponseEntity<Map<String, String>> bildirimiOkunduIsaretle(@PathVariable Long id) {
+        bildirimService.bildirimiOkunduIsaretle(id);
+        return ResponseEntity.ok(Map.of("message", "Bildirim okundu olarak işaretlendi."));
+    }
+
+    @PutMapping("/bildirimler/tumunu-okundu")
+    public ResponseEntity<Map<String, String>> tumBildirimleriOkunduIsaretle() {
+        bildirimService.tumBildirimleriOkunduIsaretle();
+        return ResponseEntity.ok(Map.of("message", "Tüm bildirimler okundu olarak işaretlendi."));
     }
 }

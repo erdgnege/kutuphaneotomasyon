@@ -1,78 +1,57 @@
 package com.kutuphane.otomasyon.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import org.hibernate.annotations.CreationTimestamp;
+import java.time.LocalDateTime;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Inheritance;
-import jakarta.persistence.InheritanceType;
-import jakarta.persistence.Table;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-
-// ABSTRACT (Soyut): Bu sınıfın kendi başına bir tablosu olmayacak, 
-// alt sınıflar (Uye, Personel) bunu kullanacak.
-@Entity // Bu sınıfın bir JPA varlığı (Entity) olduğunu belirtir.
-// Kalıtım Stratejisi: SINGLE_TABLE (Tek Tablo) kullanılır. Tüm alt sınıfların
-// verileri tek tabloda tutulur.
-@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
-@Table(name = "kullanicilar") // Tüm kullanıcı tiplerinin verilerinin tutulduğu ortak tablo
-@JsonIgnoreProperties(ignoreUnknown = true)
+@Entity
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE) // Üye ve Personel aynı tabloda tutulsun diye
+@Table(name = "kullanicilar")
+@DiscriminatorColumn(name = "dtype", discriminatorType = DiscriminatorType.STRING)
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "dtype", visible = true, include = JsonTypeInfo.As.PROPERTY, defaultImpl = Uye.class)
+@JsonSubTypes({
+        @JsonSubTypes.Type(value = Uye.class, name = "UYE"),
+        @JsonSubTypes.Type(value = Personel.class, name = "PERSONEL")
+})
 public abstract class Kullanici {
 
-    @Id // Birincil anahtar (Primary Key)
-    @GeneratedValue(strategy = GenerationType.IDENTITY) // ID'nin DB tarafından otomatik artırılmasını sağlar.
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false) // Veritabanı seviyesinde zorunlu (NOT NULL)
-    @NotBlank(message = "Ad Soyad boş olamaz") // API validasyonu
+    @NotBlank(message = "İsim alanı boş bırakılamaz")
+    @Column(name = "ad_soyad") // Veritabanındaki gerçek sütun adını buraya yazıyoruz
     private String adSoyad;
 
-    @Column(unique = true, nullable = false) // Benzersiz (UNIQUE) ve zorunlu (NOT NULL)
-    @Email(message = "Geçerli bir email adresi girilmelidir") // Email format validasyonu
-    @NotBlank(message = "Mail adresi boş olamaz")
+    @Email(message = "Geçerli bir e-posta giriniz")
+    @NotBlank(message = "E-posta zorunludur")
+    @Column(unique = true)
     private String email;
 
-    @Column(nullable = true) // Veritabanında boş (NULL) geçilebilir (Opsiyonel alan)
+    @Column(unique = true, length = 11, nullable = true)
     private String telefon;
 
-    // --- OOP ve İş Mantığı Alanları ---
+    @CreationTimestamp
+    @Column(name = "kayit_tarihi", nullable = true, updatable = false)
+    private LocalDateTime kayitTarihi;
 
-    // Gerçek uygulamada burası @OneToMany ilişkisi ile Kitap tablosuna
-    // bağlanmalıdır.
-    // List<Kitap> oduncAlinanlar;
-
-    // JPA/Hibernate'in veritabanından veri çekerken nesne oluşturması için gerekli
-    // boş constructor.
+    // Boş constructor
     public Kullanici() {
     }
 
-    /**
-     * Alt sınıfların (Uye/Personel) üst sınıfın zorunlu alanlarını başlatması için
-     * parametreli constructor.
-     * Bu, constructor zincirini kurar ve zorunlu alanları set metotları üzerinden
-     * (validasyonlu) atar.
-     */
+    // Bilgileri hızlıca atamak için constructor
     public Kullanici(String adSoyad, String email) {
-        // Setter metotları çağrılarak Kapsülleme (Encapsulation) sağlanır ve
-        // validasyonlar tetiklenir.
-        this.setAdSoyad(adSoyad);
-        this.setEmail(email);
+        this.adSoyad = adSoyad;
+        this.email = email;
     }
 
-    // --- Kalıtım ve Polimorfizm için Abstract Metot ---
-
-    /**
-     * Polimorfizm için zorunlu soyut metot.
-     * Alt sınıflar kendi ödünç alma limit kurallarını uygulamak (Override etmek)
-     * zorundadır.
-     */
+    // Üye ve Personel tipleri için limit kuralı (Alt sınıflar dolduracak)
     public abstract int oduncAlmaLimitiHesapla();
 
-    // --- Getter ve Setter Metotları (Kapsülleme) ---
+    // --- Getter ve Setterlar ---
 
     public Long getId() {
         return id;
@@ -104,5 +83,13 @@ public abstract class Kullanici {
 
     public void setTelefon(String telefon) {
         this.telefon = telefon;
+    }
+
+    public LocalDateTime getKayitTarihi() {
+        return kayitTarihi;
+    }
+
+    public void setKayitTarihi(LocalDateTime kayitTarihi) {
+        this.kayitTarihi = kayitTarihi;
     }
 }

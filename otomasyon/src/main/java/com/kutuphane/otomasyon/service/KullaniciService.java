@@ -1,79 +1,92 @@
 package com.kutuphane.otomasyon.service;
 
-import com.kutuphane.otomasyon.model.Personel;
-import com.kutuphane.otomasyon.model.Kullanici; // Temel soyut sınıf
-import com.kutuphane.otomasyon.model.Uye; // Alt sınıf
-import com.kutuphane.otomasyon.repository.KullaniciRepository; // Veri erişim katmanı
-import org.springframework.stereotype.Service; // Bu sınıfın bir servis bileşeni olduğunu belirtir
+import com.kutuphane.otomasyon.model.*;
+import com.kutuphane.otomasyon.repository.KullaniciRepository;
+import com.kutuphane.otomasyon.exception.KutuphaneHatasi;
+import org.springframework.stereotype.Service;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class KullaniciService {
 
-    private final KullaniciRepository kullaniciRepository; // Repository bağımlılığı
+    private final KullaniciRepository kullaniciRepository;
 
-    /**
-     * Repository'yi enjekte etmek için kullanılan kurucu metot (Constructor
-     * Injection).
-     */
     public KullaniciService(KullaniciRepository kullaniciRepository) {
         this.kullaniciRepository = kullaniciRepository;
     }
 
-    // --- TEMEL İŞ MANTIKLARI ---
+    // Polimorfizm budur kanka: Parametre olarak üst sınıfı (Kullanici) alırız,
+    // içine Uye de gelse Personel de gelse Java bunu kabul eder.
+    public Kullanici kullaniciKaydet(Kullanici kullanici) {
+        // E-posta kontrolü (sadece başka bir kullanıcı tarafından kullanılıyorsa hata ver)
+        if (kullanici.getEmail() != null) {
+            kullaniciRepository.findByEmail(kullanici.getEmail())
+                    .ifPresent(existing -> {
+                        // Eğer mevcut kullanıcının kendi email'i değilse hata ver
+                        if (!existing.getId().equals(kullanici.getId())) {
+                            throw new KutuphaneHatasi("Bu e-posta adresi zaten kullanılıyor: " + kullanici.getEmail());
+                        }
+                    });
+        }
 
-    /**
-     * 1. Yeni Kullanıcı Ekleme veya Mevcut Kullanıcıyı Güncelleme.
-     * Generics (<T extends Kullanici>) ve Polimorfizm sayesinde hem Uye hem de
-     * Personel kaydedilebilir.
-     */
-    public <T extends Kullanici> T kullaniciEkle(T kullanici) {
-        // İş kuralı (Örn: Emailin daha önce kaydedilip kaydedilmediği) gerekirse buraya
-        // yazılır.
+        // Telefon kontrolü (sadece başka bir kullanıcı tarafından kullanılıyorsa hata ver)
+        if (kullanici.getTelefon() != null && !kullanici.getTelefon().trim().isEmpty()) {
+            kullaniciRepository.findByTelefon(kullanici.getTelefon())
+                    .ifPresent(existing -> {
+                        // Eğer mevcut kullanıcının kendi telefonu değilse hata ver
+                        if (!existing.getId().equals(kullanici.getId())) {
+                            throw new KutuphaneHatasi("Bu telefon numarası zaten kullanılıyor: " + kullanici.getTelefon());
+                        }
+                    });
+        }
+
+        // Üye ise üye numarası kontrolü (sadece başka bir üye tarafından kullanılıyorsa hata ver)
+        if (kullanici instanceof Uye) {
+            Uye uye = (Uye) kullanici;
+            if (uye.getUyeNo() != null) {
+                kullaniciRepository.findByUyeNo(uye.getUyeNo())
+                        .ifPresent(existing -> {
+                            // Eğer mevcut üyenin kendi üye numarası değilse hata ver
+                            if (!existing.getId().equals(uye.getId())) {
+                                throw new KutuphaneHatasi("Bu üye numarası zaten kullanılıyor: " + uye.getUyeNo());
+                            }
+                        });
+            }
+        }
+
         return kullaniciRepository.save(kullanici);
     }
 
-    /**
-     * 2. ID ile Kullanıcı Bulma.
-     * 
-     * @return Bulunan kullanıcıyı (Uye veya Personel olabilir) içeren Optional.
-     */
-    public Optional<Kullanici> kullaniciBulById(Long id) {
-        return kullaniciRepository.findById(id);
+    // ID ile kullanıcı bulma (Özel hata fırlatmalı)
+    public Kullanici kullaniciBulById(Long id) {
+        return kullaniciRepository.findById(id)
+                .orElseThrow(() -> new KutuphaneHatasi("Kullanıcı bulunamadı! ID: " + id));
     }
 
-    /**
-     * Veritabanındaki tüm kullanıcıları (Uye ve Personel dahil) getirir.
-     * 
-     * @return Kullanici tipinde Polimorfik bir liste.
-     */
+    // Üye numarası ile üye bulma
+    public Uye uyeBulByUyeNo(String uyeNo) {
+        return kullaniciRepository.findByUyeNo(uyeNo)
+                .orElseThrow(() -> new KutuphaneHatasi("Üye bulunamadı! Üye No: " + uyeNo));
+    }
+
+    // Listeler
     public List<Kullanici> tumKullanicilariGetir() {
         return kullaniciRepository.findAll();
     }
 
-    /**
-     * 3. Tüm Üyeleri Getirme.
-     * Repository'deki özel JPQL sorgusu (@Query) kullanılarak sadece Uye tipleri
-     * filtrelenir.
-     */
     public List<Uye> tumUyeleriGetir() {
         return kullaniciRepository.findAllUyeler();
     }
 
-    /**
-     * Tüm personelleri Getirme.
-     * Repository'deki özel JPQL sorgusu kullanılarak sadece Personel tipleri
-     * filtrelenir.
-     */
     public List<Personel> tumPersonelleriGetir() {
         return kullaniciRepository.findAllPersoneller();
     }
 
-    /**
-     * 4. Kullanıcıyı ID ile silme.
-     */
+    // Kullanıcı silme
     public void kullaniciSil(Long id) {
+        if (!kullaniciRepository.existsById(id)) {
+            throw new KutuphaneHatasi("Sistemde böyle bir kullanıcı kayıtlı değil.");
+        }
         kullaniciRepository.deleteById(id);
     }
 }

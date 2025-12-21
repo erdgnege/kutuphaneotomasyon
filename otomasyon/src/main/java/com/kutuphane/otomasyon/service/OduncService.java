@@ -1,132 +1,176 @@
 package com.kutuphane.otomasyon.service;
 
-import com.kutuphane.otomasyon.model.Kitap;
-import com.kutuphane.otomasyon.exception.IsKuraliException;
-import com.kutuphane.otomasyon.exception.KaynakBulunamadiException;
-import com.kutuphane.otomasyon.model.Odunc;
-import com.kutuphane.otomasyon.model.Kullanici;
-import com.kutuphane.otomasyon.repository.KitapRepository;
-import com.kutuphane.otomasyon.repository.OduncRepository;
-import com.kutuphane.otomasyon.repository.KullaniciRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.kutuphane.otomasyon.model.*;
+import com.kutuphane.otomasyon.repository.*;
+import com.kutuphane.otomasyon.exception.KutuphaneHatasi;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * Kitap ödünç alma ve iade etme ile ilgili iş mantığını yöneten servis sınıfı.
- */
 @Service
 public class OduncService {
-
-    private static final Logger log = LoggerFactory.getLogger(OduncService.class);
-
-    private static final String KULLANICI_BULUNAMADI_MESAJI = "Kullanıcı bulunamadı. ID: ";
-    private static final String KITAP_BULUNAMADI_MESAJI = "Kitap bulunamadı. ID: ";
-    private static final String ODUNC_KAYDI_BULUNAMADI_MESAJI = "Ödünç kaydı bulunamadı. ID: ";
 
     private final KitapRepository kitapRepository;
     private final KullaniciRepository kullaniciRepository;
     private final OduncRepository oduncRepository;
+    private final BildirimService bildirimService;
 
-    /**
-     * Gerekli repository'leri enjekte etmek için kullanılan kurucu metot.
-     * 
-     * @param kitapRepository     Kitap veritabanı işlemleri için.
-     * @param kullaniciRepository Kullanıcı veritabanı işlemleri için.
-     * @param oduncRepository     Ödünç kaydı veritabanı işlemleri için.
-     */
+    @PersistenceContext
+    private EntityManager entityManager;
+
     public OduncService(KitapRepository kitapRepository, KullaniciRepository kullaniciRepository,
-            OduncRepository oduncRepository) {
+            OduncRepository oduncRepository, BildirimService bildirimService) {
         this.kitapRepository = kitapRepository;
         this.kullaniciRepository = kullaniciRepository;
         this.oduncRepository = oduncRepository;
+        this.bildirimService = bildirimService;
     }
 
-    /**
-     * Bir kullanıcıya kitap ödünç verme işlemini yönetir.
-     * Bu metot; kullanıcı ve kitap varlığını, ödünç alma limitini ve kitap stok
-     * durumunu kontrol eder.
-     * 
-     * @param userId  Kitabı alacak kullanıcının ID'si.
-     * @param kitapId Ödünç verilecek kitabın ID'si.
-     * @return Oluşturulan yeni Odunc kaydı.
-     */
-    @Transactional // Bu metot içindeki veritabanı işlemlerinin bir bütün olarak çalışmasını
-                   // sağlar.
+    @Transactional
     public Odunc kitapOduncVer(Long userId, Long kitapId) {
+        return kitapOduncVer(userId, kitapId, false);
+    }
 
-        // 1. Kullanıcıyı ve Kitabı bul
+    @Transactional
+    public Odunc kitapOduncVer(Long userId, Long kitapId, boolean bildirimOlustur) {
+        // 1. Kullanıcıyı ve Kitabı getir (Yoksa hatayı patlat)
         Kullanici kullanici = kullaniciRepository.findById(userId)
-                .orElseThrow(() -> new KaynakBulunamadiException(KULLANICI_BULUNAMADI_MESAJI + userId));
+                .orElseThrow(() -> new KutuphaneHatasi("Kullanıcı bulunamadı!"));
 
         Kitap kitap = kitapRepository.findById(kitapId)
-                .orElseThrow(() -> new KaynakBulunamadiException(KITAP_BULUNAMADI_MESAJI + kitapId));
+                .orElseThrow(() -> new KutuphaneHatasi("Kitap bulunamadı!"));
 
-        // Polimorfizm: User nesnesi Uye veya Personel olabilir, doğru metot çalışır.
+        // 2. İş Kuralları (Limit ve Stok Kontrolü)
         int limit = kullanici.oduncAlmaLimitiHesapla();
+        List<Odunc> aktifOduncler = oduncRepository.findByKullaniciIdAndTeslimTarihiIsNull(userId);
 
-        // 2. Limit Kontrolü (İş Mantığı)
-        List<Odunc> uyeninOduncleri = oduncRepository.findByKullaniciIdAndTeslimTarihiIsNull(userId);
-        if (uyeninOduncleri.size() >= limit) {
-            throw new IsKuraliException("Ödünç alma limiti dolmuştur (" + limit + " kitap).");
+        if (aktifOduncler.size() >= limit) {
+            throw new KutuphaneHatasi("Ödünç alma limitiniz dolmuş! Limit: " + limit);
         }
 
-        // 3. Stok kontrolü
         if (!kitap.isMevcut()) {
-            throw new IsKuraliException("Seçilen kitap stokta mevcut değil.");
+            throw new KutuphaneHatasi("Bu kitap şu an başkasında kanka, mevcut değil.");
         }
 
-        // 4. İşlemleri yap (Veritabanını güncelle)
-        kitap.setMevcut(false); // Kitabın durumunu "mevcut değil" yap
-        kitapRepository.save(kitap); // Kitap Entity'sini DB'de güncelle
+        // 3. Kitabı güncelle ve Ödünç kaydını oluştur
+        kitap.setMevcut(false);
+        kitapRepository.save(kitap);
 
-        // 6. Odunc tablosuna yeni kayıt ekle
-        Odunc yeniOdunc = new Odunc();
-        yeniOdunc.setKullanici(kullanici);
-        yeniOdunc.setKitap(kitap);
-        yeniOdunc.setOduncTarihi(LocalDate.now());
-        // Teslim tarihi başlangıçta null olacak
+        Odunc yeniOdunc = new Odunc(kitap, kullanici);
+        yeniOdunc = oduncRepository.save(yeniOdunc);
 
-        log.info("{} ({}) adlı kullanıcı, '{}' adlı kitabı ödünç aldı. Kullanıcı ID: {}, Kitap ID: {}",
-                kullanici.getAdSoyad(), kullanici.getClass().getSimpleName(), kitap.getBaslik(), userId, kitapId);
+        // 4. Lazy loading'i force et (transaction içinde) - Response serialization için
+        // EAGER fetch kullandığımız için artık gerekli değil ama yine de emin olmak
+        // için
+        yeniOdunc.getKullanici().getAdSoyad();
+        yeniOdunc.getKitap().getBaslik();
 
-        return oduncRepository.save(yeniOdunc);
+        // 5. Tüm değişiklikleri flush et (transaction commit edilmeden önce)
+        // Bu, entity'lerin veritabanına yazılmasını sağlar ve lazy loading sorunlarını
+        // önler
+        entityManager.flush();
+
+        // 7. Bildirim oluştur (eğer isteniyorsa - transaction dışında, hata olsa bile
+        // devam et)
+        if (bildirimOlustur) {
+            try {
+                String kullaniciAdi = kullanici.getAdSoyad();
+                String kitapAdi = kitap.getBaslik();
+                String mesaj = kullaniciAdi + " kullanıcısı '" + kitapAdi + "' kitabını ödünç aldı.";
+                bildirimService.bildirimOlustur(userId, kullaniciAdi, mesaj);
+            } catch (Exception e) {
+                // Bildirim oluşturma hatası ana işlemi etkilemesin
+                System.err.println("Bildirim oluşturma hatası: " + e.getMessage());
+            }
+        }
+
+        return yeniOdunc;
     }
 
-    /**
-     * Bir ödünç kaydını sonlandırarak kitabın iade edilmesini sağlar.
-     * Kitabın durumunu tekrar "mevcut" yapar ve ödünç kaydına teslim tarihini
-     * işler.
-     * 
-     * @param oduncId İade edilecek işleme ait ödünç kaydının ID'si.
-     * @return Güncellenmiş Odunc kaydı.
-     */
-    @Transactional // Bu metot içindeki veritabanı işlemlerinin bir bütün olarak çalışmasını
-                   // sağlar.
+    @Transactional
     public Odunc kitapIadeAl(Long oduncId) {
+        return kitapIadeAl(oduncId, false);
+    }
 
-        // 1. İade edilecek ödünç kaydını bul
+    @Transactional
+    public Odunc kitapIadeAl(Long oduncId, boolean bildirimOlustur) {
+        // 1. Kaydı bul ve kontrol et
         Odunc oduncKaydi = oduncRepository.findById(oduncId)
-                .orElseThrow(() -> new KaynakBulunamadiException(ODUNC_KAYDI_BULUNAMADI_MESAJI + oduncId));
+                .orElseThrow(() -> new KutuphaneHatasi("Böyle bir ödünç kaydı yok!"));
 
         if (oduncKaydi.getTeslimTarihi() != null) {
-            throw new IsKuraliException("Bu kitap zaten iade edilmiş.");
+            throw new KutuphaneHatasi("Bu kitap zaten kütüphaneye dönmüş.");
         }
 
-        // 2. Kitabın durumunu "mevcut" yap
+        // 2. Bildirim için bilgileri al (transaction içinde)
+        String kullaniciAdi = null;
+        Long userId = null;
+        String kitapAdi = null;
+        if (bildirimOlustur) {
+            Kullanici kullanici = oduncKaydi.getKullanici();
+            Kitap kitap = oduncKaydi.getKitap();
+            kullaniciAdi = kullanici.getAdSoyad();
+            userId = kullanici.getId();
+            kitapAdi = kitap.getBaslik();
+        }
+
+        // 3. Kitabı tekrar boşa çıkar
         Kitap kitap = oduncKaydi.getKitap();
         kitap.setMevcut(true);
         kitapRepository.save(kitap);
 
-        // 3. Ödünç kaydını güncelle (teslim tarihini ayarla)
+        // 4. Tarihi set et ve kaydet
         oduncKaydi.setTeslimTarihi(LocalDate.now());
+        oduncKaydi = oduncRepository.save(oduncKaydi);
 
-        log.info("'{}' adlı kitap iade edildi. Ödünç ID: {}", kitap.getBaslik(), oduncId);
+        // 5. Lazy loading'i force et (transaction içinde) - Response serialization için
+        // EAGER fetch kullandığımız için artık gerekli değil ama yine de emin olmak
+        // için
+        oduncKaydi.getKullanici().getAdSoyad();
+        oduncKaydi.getKitap().getBaslik();
 
-        return oduncRepository.save(oduncKaydi);
+        // 6. Tüm değişiklikleri flush et (transaction commit edilmeden önce)
+        // Bu, entity'lerin veritabanına yazılmasını sağlar ve lazy loading sorunlarını
+        // önler
+        entityManager.flush();
+
+        // 8. Bildirim oluştur (eğer isteniyorsa - transaction dışında, hata olsa bile
+        // devam et)
+        if (bildirimOlustur) {
+            try {
+                String mesaj = kullaniciAdi + " kullanıcısı '" + kitapAdi + "' kitabını iade etti.";
+                bildirimService.bildirimOlustur(userId, kullaniciAdi, mesaj);
+            } catch (Exception e) {
+                // Bildirim oluşturma hatası ana işlemi etkilemesin
+                System.err.println("Bildirim oluşturma hatası: " + e.getMessage());
+            }
+        }
+
+        return oduncKaydi;
+    }
+
+    // Tüm aktif ödünç kayıtlarını getir
+    public List<Odunc> tumAktifOduncleriGetir() {
+        return oduncRepository.findAllAktifOduncler();
+    }
+
+    // Tüm ödünç kayıtlarını getir
+    public List<Odunc> tumOduncleriGetir() {
+        return oduncRepository.findAllOrderByOduncTarihiDesc();
+    }
+
+    // Kullanıcının aktif ödünç kayıtlarını getir
+    public List<Odunc> kullaniciOduncleriGetir(Long userId) {
+        return oduncRepository.findByKullaniciIdAndTeslimTarihiIsNull(userId);
+    }
+
+    // Ödünç kaydını ID ile getir (bildirim için kullanıcı ve kitap bilgilerine
+    // erişim için)
+    public Odunc oduncKaydiBul(Long oduncId) {
+        return oduncRepository.findById(oduncId)
+                .orElseThrow(() -> new KutuphaneHatasi("Böyle bir ödünç kaydı yok!"));
     }
 }

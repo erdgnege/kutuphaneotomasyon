@@ -1,79 +1,72 @@
 package com.kutuphane.otomasyon.exception;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.context.request.WebRequest;
-
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Uygulama genelindeki istisnaları yakalayıp, istemciye standart bir formatta
- * JSON yanıtı dönmek için kullanılan merkezi hata yöneticisi.
- */
-@RestControllerAdvice // Uygulama genelindeki tüm controller'ları dinler.
+@RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class); // Hataları konsola
-                                                                                             // yazdırmak için Logger
-
-    /**
-     * Kaynak (Entity) bulunamadığında fırlatılan istisnayı yakalar.
-     * 
-     * @return HTTP 404 NOT_FOUND yanıtı döndürülür.
-     */
-    @ExceptionHandler(KaynakBulunamadiException.class)
-    public ResponseEntity<Object> handleKaynakBulunamadiException(KaynakBulunamadiException ex, WebRequest request) {
-        return buildErrorResponse(ex, HttpStatus.NOT_FOUND, request);
+    // KutuphaneHatasi fırlatıldığında burası devreye girer
+    @ExceptionHandler(KutuphaneHatasi.class)
+    public ResponseEntity<Map<String, Object>> hataMesajiniGoster(KutuphaneHatasi ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("message", ex.getMessage());
+        response.put("error", "KutuphaneHatasi");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
-    /**
-     * İş mantığı (Business Logic) hatalarını yakalar (Örn: Limit aşımı, Stok yok).
-     * 
-     * @return HTTP 400 BAD_REQUEST yanıtı döndürülür.
-     */
-    @ExceptionHandler(IsKuraliException.class)
-    public ResponseEntity<Object> handleIsKuraliException(IsKuraliException ex, WebRequest request) {
-        return buildErrorResponse(ex, HttpStatus.BAD_REQUEST, request);
+    // Veritabanı constraint ihlalleri için özel handler
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> veritabaniHatasi(DataIntegrityViolationException ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        
+        String hataMesaji = ex.getMessage();
+        String kullaniciMesaji;
+        
+        // Email unique constraint ihlali
+        if (hataMesaji != null && hataMesaji.contains("email") && hataMesaji.contains("UNIQUE")) {
+            kullaniciMesaji = "Bu e-posta adresi zaten kullanılıyor. Lütfen farklı bir e-posta adresi deneyin.";
+        }
+        // Telefon unique constraint ihlali
+        else if (hataMesaji != null && hataMesaji.contains("telefon") && hataMesaji.contains("UNIQUE")) {
+            kullaniciMesaji = "Bu telefon numarası zaten kullanılıyor. Lütfen farklı bir telefon numarası deneyin.";
+        }
+        // Üye numarası unique constraint ihlali
+        else if (hataMesaji != null && (hataMesaji.contains("uyeNo") || hataMesaji.contains("uye_no")) && hataMesaji.contains("UNIQUE")) {
+            kullaniciMesaji = "Bu üye numarası zaten kullanılıyor. Lütfen farklı bir üye numarası seçin.";
+        }
+        // Genel unique constraint ihlali
+        else if (hataMesaji != null && hataMesaji.contains("UNIQUE")) {
+            kullaniciMesaji = "Bu bilgi zaten kullanılıyor. Lütfen farklı bir değer deneyin.";
+        }
+        // Foreign key constraint ihlali
+        else if (hataMesaji != null && hataMesaji.contains("FOREIGN KEY")) {
+            kullaniciMesaji = "İlgili kayıt bulunamadı. Lütfen bilgilerinizi kontrol edin.";
+        }
+        // Genel veritabanı hatası
+        else {
+            kullaniciMesaji = "Veritabanı hatası: " + (hataMesaji != null ? hataMesaji : "Bilinmeyen hata");
+        }
+        
+        response.put("message", kullaniciMesaji);
+        response.put("error", "DataIntegrityViolationException");
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
 
-    /**
-     * Uygulama genelinde beklenmedik tüm diğer istisnaları (NullPointer vs.)
-     * yakalar.
-     * 
-     * @return HTTP 500 INTERNAL_SERVER_ERROR yanıtı döndürülür.
-     */
+    // Genel exception handler
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Object> handleGlobalException(Exception ex, WebRequest request) {
-        log.error("Beklenmedik bir hata oluştu: ", ex); // Beklenmedik hataları detaylı logla
-        return buildErrorResponse(ex, "Beklenmedik bir sunucu hatası oluştu.", HttpStatus.INTERNAL_SERVER_ERROR,
-                request);
-    }
-
-    // İstisna objesini kullanarak hata mesajını alan yardımcı metot
-    private ResponseEntity<Object> buildErrorResponse(Exception ex, HttpStatus status, WebRequest request) {
-        return buildErrorResponse(ex, ex.getMessage(), status, request);
-    }
-
-    /**
-     * Hata yanıtı için standart JSON gövdesini oluşturan temel yardımcı metot.
-     * 
-     * @return JSON gövdesi ve belirtilen HTTP durumu (status) ile yanıt döner.
-     */
-    private ResponseEntity<Object> buildErrorResponse(Exception ex, String message, HttpStatus status,
-            WebRequest request) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", LocalDateTime.now()); // Hatanın oluştuğu zaman
-        body.put("status", status.value()); // HTTP durum kodu (Örn: 404, 500)
-        body.put("error", status.getReasonPhrase()); // HTTP durum açıklaması (Örn: Not Found)
-        body.put("message", message); // İstisnanın mesajı
-        body.put("path", request.getDescription(false).replace("uri=", "")); // Hatanın oluştuğu API yolu
-
-        return new ResponseEntity<>(body, status);
+    public ResponseEntity<Map<String, Object>> genelHata(Exception ex) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("message", "Bir hata oluştu: " + ex.getMessage());
+        response.put("error", ex.getClass().getSimpleName());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 }
