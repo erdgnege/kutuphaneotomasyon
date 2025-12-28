@@ -11,22 +11,22 @@ public class Personel extends Kullanici {
 
     private String departman;
 
-    // Boş constructor
+    // Boş constructor kanka, JPA için şart
     public Personel() {
         super();
     }
 
-    // Bilgileri doldurmak için constructor
-    public Personel(String adSoyad, String email, String sicilNo, String departman) {
-        super(adSoyad, email);
+    // Kanka buraya 'sifre' parametresini ekledik ve super'e gönderdik
+    public Personel(String adSoyad, String email, String sifre, String sicilNo, String departman) {
+        super(adSoyad, email, sifre);
         this.sicilNo = sicilNo;
         this.departman = departman;
     }
 
-    // Personel için ödünç limiti (Override)
+    // Personel için ödünç limiti
     @Override
     public int oduncAlmaLimitiHesapla() {
-        return 5;
+        return 10; // Kanka istersen personelin limitini biraz artırabilirsin :)
     }
 
     // --- Getter ve Setterlar ---

@@ -1,130 +1,125 @@
 package com.kutuphane.otomasyon.config;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.http.HttpMethod;
+
 import java.util.Arrays;
 
-@Configuration // Spring Konfigürasyon sınıfı olduğunu belirtir
-@EnableWebSecurity // Security konfigürasyonunu aktif eder
+@Configuration
+@EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
 
-        // HTTP isteklerini ve güvenlik kurallarını tanımlar
+        private final JwtAuthenticationFilter jwtAuthFilter;
+        private final AuthenticationProvider authenticationProvider;
+
         @Bean
         public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
                 http
-                                // CSRF Korumasını kapatıyoruz. REST API'ler ve Postman gibi araçlar için
-                                // gereklidir.
-                                .csrf(csrf -> csrf.disable())
+                                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // CORS ayarları
+                                .csrf(csrf -> csrf.disable()) // API projelerinde kanka csrf'i kapatıyoruz
+                                .authorizeHttpRequests(auth -> auth
+                                                // 1. Herkese açık olan yollar
+                                                .requestMatchers("/api/auth/**").permitAll()
+                                                .requestMatchers("/api/kitap", "/api/kitap/{id}").permitAll() // Kitapları
+                                                                                                              // herkes
+                                                                                                              // görebilir
+                                                                                                              // (GET)
+                                                .requestMatchers("/api/kullanici/uye-no/**").permitAll() // Üye numarası
+                                                                                                         // ile arama
+                                                                                                         // (login için)
+                                                .requestMatchers("/api/kullanici/email/**").authenticated() // Email ile
+                                                                                                            // kullanıcı
+                                                                                                            // bulma
+                                                                                                            // (token
+                                                                                                            // gerekli)
 
-                                // CORS ayarını etkinleştirir. Farklı kaynaklardan (port/domain) gelen isteklere
-                                // izin verir.
-                                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                                                // 2. ADMIN ÖZEL İŞLEMLER: Kitap yönetimi ve ödünç verme/iade alma
+                                                .requestMatchers("/api/admin/**").permitAll() // Admin login endpoint'i
+                                                                                              // herkese açık
+                                                .requestMatchers("/api/kitap/ekle").hasRole("ADMIN") // Admin kitap
+                                                                                                     // ekleyebilir
+                                                .requestMatchers("/api/kitap/sil/**").hasRole("ADMIN") // Admin kitap
+                                                                                                       // silebilir
+                                                .requestMatchers("/api/kitap/guncelle/**").hasRole("ADMIN") // Admin
+                                                                                                            // kitap
+                                                                                                            // güncelleyebilir
+                                                .requestMatchers("/api/odunc/ver").hasRole("ADMIN") // Admin ödünç
+                                                                                                    // verebilir
+                                                .requestMatchers("/api/odunc/iade/**").hasRole("ADMIN") // Admin iade
+                                                                                                        // alabilir
+                                                .requestMatchers("/api/odunc/aktif").hasRole("ADMIN") // Admin aktif
+                                                                                                      // ödünçleri
+                                                                                                      // görebilir
+                                                .requestMatchers("/api/odunc/tum-kayitlar").hasRole("ADMIN") // Admin
+                                                                                                             // tüm
+                                                                                                             // kayıtları
+                                                                                                             // görebilir
+                                                .requestMatchers("/api/odunc/tum-islem-loglari").hasRole("ADMIN") // Admin
+                                                                                                                  // tüm
+                                                                                                                  // işlem
+                                                                                                                  // loglarını
+                                                                                                                  // görebilir
+                                                .requestMatchers("/api/kullanici/hepsi").hasRole("ADMIN") // Admin tüm
+                                                                                                          // kullanıcıları
+                                                                                                          // görebilir
+                                                .requestMatchers("/api/kullanici/uyeler").hasRole("ADMIN") // Admin tüm
+                                                                                                           // üyeleri
+                                                                                                           // görebilir
+                                                .requestMatchers("/api/kullanici/sil/**").hasRole("ADMIN") // Admin
+                                                                                                           // kullanıcı
+                                                                                                           // silebilir
+                                                .requestMatchers("/api/kullanici/tip-degistir/**").hasRole("ADMIN") // Admin
+                                                                                                                    // kullanıcı
+                                                                                                                    // tipini
+                                                                                                                    // değiştirebilir
 
-                                // URL bazlı yetkilendirme kurallarını başlatır
-                                .authorizeHttpRequests(authorize -> authorize
-                                                // Admin işlemleri için ADMIN rolü gerekli
-                                                .requestMatchers("/api/odunc/ver", "/api/odunc/iade/**",
-                                                                "/api/odunc/aktif")
-                                                .hasRole("ADMIN")
+                                                // 3. ÜYELERİN VE PERSONELİN kendi işlemlerini yapabileceği yollar
+                                                // (Personel artık normal üye gibi, sadece daha fazla kitap ödünç
+                                                // alabilir)
+                                                .requestMatchers("/api/odunc/kullanici-iste")
+                                                .hasAnyRole("UYE", "PERSONEL") // Üye ve Personel ödünç alabilir
+                                                .requestMatchers("/api/odunc/kullanici-iade/**")
+                                                .hasAnyRole("UYE", "PERSONEL") // Üye ve Personel kendi kitabını iade
+                                                                               // edebilir
+                                                .requestMatchers("/api/odunc/kullanici/**")
+                                                .hasAnyRole("UYE", "PERSONEL") // Üye ve Personel kendi ödünçlerini
+                                                                               // görebilir
 
-                                                // Kullanıcılar kendi adına ödünç isteği yapabilir ve iade edebilir
-                                                .requestMatchers("/api/odunc/kullanici-iste",
-                                                                "/api/odunc/kullanici-iade/**")
-                                                .permitAll()
-
-                                                // Kullanıcılar kendi bilgilerini görebilir (GET isteği için public)
-                                                .requestMatchers(HttpMethod.GET, "/api/kullanicilar/**").permitAll()
-                                                
-                                                // Üye numarası ile üye bulma endpoint'i public
-                                                .requestMatchers("/api/kullanicilar/uye-no/**").permitAll()
-
-                                                // E-posta doğrulama endpoint'leri public
-                                                .requestMatchers("/api/kullanicilar/email/**").permitAll()
-                                                
-                                                // Bildirim endpoint'leri ADMIN rolü gerektirir
-                                                .requestMatchers("/api/kullanicilar/bildirimler/**").hasRole("ADMIN")
-                                                
-                                                // Kullanıcılar üye olabilir (POST /api/kullanicilar/uye public)
-                                                .requestMatchers(HttpMethod.POST, "/api/kullanicilar/uye").permitAll()
-
-                                                // Kullanıcılar kendi bilgilerini güncelleyebilir (PUT /api/kullanicilar/kendi-bilgilerim)
-                                                .requestMatchers(HttpMethod.PUT, "/api/kullanicilar/kendi-bilgilerim/**").permitAll()
-
-                                                // Kullanıcı yönetimi (PUT, DELETE) için ADMIN rolü gerekli
-                                                .requestMatchers("/api/kullanicilar/**").hasRole("ADMIN")
-
-                                                // Kullanıcı kendi ödünçlerini görebilir (authentication gerekli değil)
-                                                .requestMatchers("/api/odunc/kullanici/**").permitAll()
-
-                                                // Kitapları herkes görebilir
-                                                .requestMatchers("/api/kitaplar/**").permitAll()
-
-                                                // Diğer tüm istekler kimlik doğrulaması gerektirir
+                                                // 4. Geri kalan her şey için giriş yapmış olmak şart
                                                 .anyRequest().authenticated())
+                                // Session tutmuyoruz kanka, her şey JWT üzerinden dönecek (Stateless)
+                                .sessionManagement(session -> session
+                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .authenticationProvider(authenticationProvider)
+                                // Bizim yazdığımız JWT filtresini, standart şifre filtresinden önceye koyuyoruz
+                                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
-                                // HTTP Basic Auth'u etkinleştirir. Kullanıcı adı/şifre Header ile gönderilir.
-                                .httpBasic(httpBasic -> {
-                                });
-
-                return http.build(); // Yapılandırılmış SecurityFilterChain nesnesini döndürür
+                return http.build();
         }
 
-        // Password encoder bean'i
-        @Bean
-        public PasswordEncoder passwordEncoder() {
-                return new BCryptPasswordEncoder();
-        }
-
-        // Kullanıcı adı ve rolleri bellekte (in-memory) tutan servisi tanımlar (Geçici
-        // kullanıcılar)
-        @Bean
-        public UserDetailsService userDetailsService() {
-                PasswordEncoder encoder = passwordEncoder();
-
-                // ADMIN rolüne sahip kullanıcı
-                UserDetails admin = User.builder()
-                                .username("admin")
-                                .password(encoder.encode("123456"))
-                                .roles("ADMIN")
-                                .build();
-
-                // USER rolüne sahip normal kullanıcı (Kütüphane üyesini temsil edebilir)
-                UserDetails user = User.builder()
-                                .username("user")
-                                .password(encoder.encode("sifre"))
-                                .roles("USER")
-                                .build();
-
-                // Bellekteki kullanıcıları yöneten servisi döndürür
-                return new InMemoryUserDetailsManager(admin, user);
-        }
-
-        // CORS yapılandırması - Frontend'den gelen isteklere izin verir
         @Bean
         public CorsConfigurationSource corsConfigurationSource() {
                 CorsConfiguration configuration = new CorsConfiguration();
-                configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000", "http://localhost:8080",
-                                "http://127.0.0.1:5500", "file://")); // Frontend portları
+                configuration.setAllowedOriginPatterns(Arrays.asList("*")); // Tüm origin'lere izin ver (development
+                                                                            // için)
                 configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                 configuration.setAllowedHeaders(Arrays.asList("*"));
-                configuration.setAllowCredentials(true);
-                configuration.setMaxAge(3600L);
+                configuration.setAllowCredentials(false); // Wildcard origin ile credentials kullanılamaz
+                configuration.setExposedHeaders(Arrays.asList("Authorization"));
 
                 UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-                source.registerCorsConfiguration("/api/**", configuration);
+                source.registerCorsConfiguration("/**", configuration);
                 return source;
         }
 }

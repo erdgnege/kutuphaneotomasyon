@@ -114,14 +114,19 @@
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label for="uyeNoInput" class="form-label">Üye Numarası</label>
-                            <input type="text" class="form-control" id="uyeNoInput" placeholder="6 haneli üye numaranızı giriniz" required maxlength="6" pattern="[0-9]{6}">
-                            <small class="form-text text-muted">Kayıt olurken seçtiğiniz 6 haneli üye numaranız</small>
+                            <label for="userEmailInput" class="form-label">E-posta</label>
+                            <input type="email" class="form-control" id="userEmailInput" placeholder="E-posta adresinizi giriniz" required onkeypress="if(event.key === 'Enter') verifyUserLogin()">
+                            <small class="form-text text-muted">Kayıt olurken kullandığınız e-posta adresiniz</small>
                         </div>
                         <div class="mb-3">
-                            <label for="userEmailOrPhoneInput" class="form-label">E-posta veya Telefon</label>
-                            <input type="text" class="form-control" id="userEmailOrPhoneInput" placeholder="E-posta adresinizi veya telefon numaranızı giriniz" required onkeypress="if(event.key === 'Enter') verifyUserLogin()">
-                            <small class="form-text text-muted">Doğrulama için e-posta adresinizi veya telefon numaranızı giriniz</small>
+                            <label for="userPasswordInput" class="form-label">Şifre</label>
+                            <input type="password" class="form-control" id="userPasswordInput" placeholder="Şifrenizi giriniz" required onkeypress="if(event.key === 'Enter') verifyUserLogin()">
+                            <small class="form-text text-muted">Hesabınızın şifresi</small>
+                        </div>
+                        <div class="mb-2 text-end">
+                            <a href="#" class="text-decoration-none" onclick="showForgotPasswordModal(event)">
+                                <small class="text-primary" style="cursor: pointer;">Şifremi Unuttum</small>
+                            </a>
                         </div>
                         <div id="userLoginAlert" class="alert d-none" role="alert"></div>
                     </div>
@@ -183,6 +188,65 @@
                         <span class="spinner-border spinner-border-sm loading-spinner" role="status" aria-hidden="true"></span>
                         Güncelle
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Şifre Sıfırlama Modal -->
+    <div class="modal fade" id="forgotPasswordModal" tabindex="-1" aria-labelledby="forgotPasswordModalLabel" aria-hidden="true" data-bs-backdrop="true" data-bs-keyboard="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="forgotPasswordModalLabel">
+                        <i class="bi bi-key"></i> Şifre Sıfırlama
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="forgotPasswordStep1">
+                        <p class="text-muted">E-posta adresinize şifre sıfırlama kodu gönderilecektir.</p>
+                        <div class="mb-3">
+                            <label for="forgotPasswordEmailInput" class="form-label">E-posta</label>
+                            <input type="email" class="form-control" id="forgotPasswordEmailInput" placeholder="E-posta adresinizi giriniz" required>
+                            <small class="form-text text-muted">Kayıt olurken kullandığınız e-posta adresiniz</small>
+                        </div>
+                        <div id="forgotPasswordAlert" class="alert d-none" role="alert"></div>
+                    </div>
+                    <div id="forgotPasswordStep2" style="display: none;">
+                        <p class="text-muted">E-posta adresinize gönderilen 6 haneli kodu giriniz.</p>
+                        <div class="mb-3">
+                            <label for="resetCodeInput" class="form-label">Şifre Sıfırlama Kodu</label>
+                            <input type="text" class="form-control" id="resetCodeInput" placeholder="6 haneli kodu giriniz" maxlength="6" pattern="[0-9]{6}">
+                            <small class="form-text text-muted">E-posta adresinize gönderilen kod</small>
+                        </div>
+                        <div class="mb-3">
+                            <label for="newPasswordInput" class="form-label">Yeni Şifre</label>
+                            <input type="password" class="form-control" id="newPasswordInput" placeholder="Yeni şifrenizi giriniz" required>
+                            <small class="form-text text-muted">En az 6 karakter olmalıdır</small>
+                        </div>
+                        <div class="mb-3">
+                            <label for="newPasswordConfirmInput" class="form-label">Yeni Şifre (Tekrar)</label>
+                            <input type="password" class="form-control" id="newPasswordConfirmInput" placeholder="Yeni şifrenizi tekrar giriniz" required>
+                        </div>
+                        <div id="resetPasswordAlert" class="alert d-none" role="alert"></div>
+                    </div>
+                </div>
+                <div class="modal-footer d-flex flex-column">
+                    <div id="forgotPasswordButtons1">
+                        <button type="button" class="btn btn-primary w-100 mb-2" onclick="sendPasswordResetCode()" id="sendResetCodeBtn">
+                            <span class="spinner-border spinner-border-sm loading-spinner" role="status" aria-hidden="true"></span>
+                            Kod Gönder
+                        </button>
+                        <button type="button" class="btn btn-secondary w-100" data-bs-dismiss="modal">İptal</button>
+                    </div>
+                    <div id="forgotPasswordButtons2" style="display: none;">
+                        <button type="button" class="btn btn-primary w-100 mb-2" onclick="resetPassword()" id="resetPasswordBtn">
+                            <span class="spinner-border spinner-border-sm loading-spinner" role="status" aria-hidden="true"></span>
+                            Şifreyi Sıfırla
+                        </button>
+                        <button type="button" class="btn btn-secondary w-100" onclick="backToForgotPasswordStep1()">Geri</button>
+                    </div>
                 </div>
             </div>
         </div>

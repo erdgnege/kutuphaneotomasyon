@@ -4,12 +4,19 @@ import com.kutuphane.otomasyon.model.*;
 import com.kutuphane.otomasyon.repository.KullaniciRepository;
 import com.kutuphane.otomasyon.exception.KutuphaneHatasi;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.util.List;
+import java.util.Random;
 
 @Service
 public class KullaniciService {
 
     private final KullaniciRepository kullaniciRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public KullaniciService(KullaniciRepository kullaniciRepository) {
         this.kullaniciRepository = kullaniciRepository;
@@ -63,6 +70,12 @@ public class KullaniciService {
                 .orElseThrow(() -> new KutuphaneHatasi("Kullanıcı bulunamadı! ID: " + id));
     }
 
+    // Email ile kullanıcı bulma
+    public Kullanici kullaniciBulByEmail(String email) {
+        return kullaniciRepository.findByEmail(email)
+                .orElseThrow(() -> new KutuphaneHatasi("Kullanıcı bulunamadı! Email: " + email));
+    }
+
     // Üye numarası ile üye bulma
     public Uye uyeBulByUyeNo(String uyeNo) {
         return kullaniciRepository.findByUyeNo(uyeNo)
@@ -88,5 +101,67 @@ public class KullaniciService {
             throw new KutuphaneHatasi("Sistemde böyle bir kullanıcı kayıtlı değil.");
         }
         kullaniciRepository.deleteById(id);
+    }
+
+    // Kullanıcı tipini değiştir (Üye <-> Personel)
+    @Transactional
+    public Kullanici kullaniciTipiniDegistir(Long id, String yeniTip) {
+        Kullanici mevcutKullanici = kullaniciBulById(id);
+        
+        if (!yeniTip.equals("UYE") && !yeniTip.equals("PERSONEL")) {
+            throw new KutuphaneHatasi("Geçersiz kullanıcı tipi! Sadece 'UYE' veya 'PERSONEL' olabilir.");
+        }
+        
+        // Mevcut tip ile yeni tip aynıysa değişiklik yapma
+        String mevcutTip = mevcutKullanici instanceof Uye ? "UYE" : "PERSONEL";
+        if (mevcutTip.equals(yeniTip)) {
+            return mevcutKullanici; // Değişiklik yok, mevcut kullanıcıyı döndür
+        }
+        
+        // Uye -> Personel dönüşümü
+        if (mevcutKullanici instanceof Uye && yeniTip.equals("PERSONEL")) {
+            // Personel için gerekli alanlar
+            // Sicil no oluştur (6 haneli rastgele sayı)
+            Random random = new Random();
+            String sicilNo;
+            boolean sicilNoExists;
+            do {
+                sicilNo = String.format("%06d", random.nextInt(1000000));
+                final String finalSicilNo = sicilNo;
+                sicilNoExists = kullaniciRepository.findAllPersoneller().stream()
+                        .anyMatch(p -> finalSicilNo.equals(p.getSicilNo()));
+            } while (sicilNoExists);
+            
+            // Native query ile dtype, sicil_no, departman güncelle ve uye_no'yu temizle
+            entityManager.createNativeQuery("UPDATE kullanicilar SET dtype = :yeniTip, sicil_no = :sicilNo, departman = :departman, uye_no = NULL WHERE id = :id")
+                    .setParameter("yeniTip", yeniTip)
+                    .setParameter("sicilNo", sicilNo)
+                    .setParameter("departman", "Genel")
+                    .setParameter("id", id)
+                    .executeUpdate();
+        } else {
+            // Personel -> Uye dönüşümü
+            // Üye no oluştur (6 haneli rastgele sayı)
+            Random random = new Random();
+            String uyeNo;
+            boolean uyeNoExists;
+            do {
+                uyeNo = String.format("%06d", random.nextInt(1000000));
+                final String finalUyeNo = uyeNo;
+                uyeNoExists = kullaniciRepository.findAllUyeler().stream()
+                        .anyMatch(u -> finalUyeNo.equals(u.getUyeNo()));
+            } while (uyeNoExists);
+            
+            // Native query ile dtype, uye_no güncelle ve sicil_no, departman'ı temizle
+            entityManager.createNativeQuery("UPDATE kullanicilar SET dtype = :yeniTip, uye_no = :uyeNo, sicil_no = NULL, departman = NULL WHERE id = :id")
+                    .setParameter("yeniTip", yeniTip)
+                    .setParameter("uyeNo", uyeNo)
+                    .setParameter("id", id)
+                    .executeUpdate();
+        }
+        
+        // EntityManager cache'ini temizle ve entity'yi tekrar yükle
+        entityManager.clear();
+        return kullaniciBulById(id);
     }
 }

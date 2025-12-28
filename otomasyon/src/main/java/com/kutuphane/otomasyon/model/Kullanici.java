@@ -5,10 +5,16 @@ import jakarta.validation.constraints.*;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.hibernate.annotations.CreationTimestamp;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
 
 @Entity
-@Inheritance(strategy = InheritanceType.SINGLE_TABLE) // Üye ve Personel aynı tabloda tutulsun diye
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 @Table(name = "kullanicilar")
 @DiscriminatorColumn(name = "dtype", discriminatorType = DiscriminatorType.STRING)
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "dtype", visible = true, include = JsonTypeInfo.As.PROPERTY, defaultImpl = Uye.class)
@@ -16,20 +22,26 @@ import java.time.LocalDateTime;
         @JsonSubTypes.Type(value = Uye.class, name = "UYE"),
         @JsonSubTypes.Type(value = Personel.class, name = "PERSONEL")
 })
-public abstract class Kullanici {
+// Kanka buraya UserDetails ekledik, Spring Security artık bu class'ın dilinden
+// anlayacak
+public abstract class Kullanici implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @NotBlank(message = "İsim alanı boş bırakılamaz")
-    @Column(name = "ad_soyad") // Veritabanındaki gerçek sütun adını buraya yazıyoruz
+    @Column(name = "ad_soyad")
     private String adSoyad;
 
     @Email(message = "Geçerli bir e-posta giriniz")
     @NotBlank(message = "E-posta zorunludur")
     @Column(unique = true)
     private String email;
+
+    // Kanka burası çok kritik, şifre alanı ekledik!
+    @NotBlank(message = "Şifre zorunludur")
+    private String sifre;
 
     @Column(unique = true, length = 11, nullable = true)
     private String telefon;
@@ -38,21 +50,62 @@ public abstract class Kullanici {
     @Column(name = "kayit_tarihi", nullable = true, updatable = false)
     private LocalDateTime kayitTarihi;
 
-    // Boş constructor
+    // --- Spring Security İçin Gerekli Metodlar ---
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        // Kanka burada dtype'a göre (UYE veya PERSONEL) yetki veriyoruz.
+        // Personel ise ADMIN, Uye ise USER rolü verelim mesela.
+        String role = this.getClass().getSimpleName().toUpperCase();
+        // Eğer Personel ise "ROLE_PERSONEL" döner. SecurityConfig'de
+        // hasRole("PERSONEL") diyebilirsin.
+        return List.of(new SimpleGrantedAuthority("ROLE_" + role));
+    }
+
+    @Override
+    public String getPassword() {
+        return sifre; // Spring Security şifreyi buradan alacak
+    }
+
+    @Override
+    public String getUsername() {
+        return email; // Biz giriş yaparken email kullanacağız kanka
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return true;
+    }
+
+    // --- Standart Constructor, Getter ve Setterlar ---
+
     public Kullanici() {
     }
 
-    // Bilgileri hızlıca atamak için constructor
-    public Kullanici(String adSoyad, String email) {
+    public Kullanici(String adSoyad, String email, String sifre) {
         this.adSoyad = adSoyad;
         this.email = email;
+        this.sifre = sifre;
     }
 
-    // Üye ve Personel tipleri için limit kuralı (Alt sınıflar dolduracak)
     public abstract int oduncAlmaLimitiHesapla();
 
-    // --- Getter ve Setterlar ---
-
+    // Getter & Setter
     public Long getId() {
         return id;
     }
@@ -75,6 +128,14 @@ public abstract class Kullanici {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getSifre() {
+        return sifre;
+    }
+
+    public void setSifre(String sifre) {
+        this.sifre = sifre;
     }
 
     public String getTelefon() {

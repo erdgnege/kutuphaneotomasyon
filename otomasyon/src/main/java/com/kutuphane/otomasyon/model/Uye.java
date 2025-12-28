@@ -9,24 +9,21 @@ public class Uye extends Kullanici {
     @Column(unique = true, length = 6, nullable = false)
     private String uyeNo;
 
-    // Boş constructor
+    // Boş constructor kanka, JPA'nın içi rahat etsin
     public Uye() {
         super();
     }
 
-    // Bilgileri hızlıca girmek için constructor
-    public Uye(String adSoyad, String email, String uyeNo) {
-        super(adSoyad, email);
+    // Kanka buraya da 'sifre' ekledik, kayıt olurken lazım olacak
+    public Uye(String adSoyad, String email, String sifre, String uyeNo) {
+        super(adSoyad, email, sifre);
         this.uyeNo = uyeNo;
     }
 
-    // Üye için ödünç limiti (Polimorfizm)
     @Override
     public int oduncAlmaLimitiHesapla() {
         return 3;
     }
-
-    // --- Getter ve Setter ---
 
     public String getUyeNo() {
         return uyeNo;

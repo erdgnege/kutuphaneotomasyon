@@ -1,92 +1,86 @@
 package com.kutuphane.otomasyon.controller;
 
+import com.kutuphane.otomasyon.dto.IslemLogDTO;
 import com.kutuphane.otomasyon.model.Odunc;
 import com.kutuphane.otomasyon.service.OduncService;
+import com.kutuphane.otomasyon.service.TumIslemLoglariService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/odunc")
+@RequiredArgsConstructor
 public class OduncController {
 
     private final OduncService oduncService;
+    private final TumIslemLoglariService tumIslemLoglariService;
 
-    public OduncController(OduncService oduncService) {
-        this.oduncService = oduncService;
-    }
-
-    /*
-     * POST: http://localhost:8080/api/odunc/ver?kitapId=1&userId=2
-     * Bu işlem RequestBody değil, RequestParam kullanır kanka.
-     * Postman'de 'Params' kısmına kitapId ve userId ekleyeceksin.
-     */
+    // 1. ADMIN ÖZEL: Kitap Ödünç Ver (Fiziksel teslimat anında admin yapar)
     @PostMapping("/ver")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Odunc> kitapOduncVer(
             @RequestParam Long kitapId,
             @RequestParam Long userId) {
 
-        return new ResponseEntity<>(oduncService.kitapOduncVer(userId, kitapId), HttpStatus.CREATED);
+        // Personel yaptığı için bildirimOlustur'u true geçiyoruz kanka
+        return new ResponseEntity<>(oduncService.kitapOduncVer(userId, kitapId, true), HttpStatus.CREATED);
     }
 
-    /*
-     * PUT: http://localhost:8080/api/odunc/iade/1
-     * {id} yerine ödünç işleminin ID'sini yazıyorsun brom.
-     */
+    // 2. ADMIN ÖZEL: Kitap İade Al
     @PutMapping("/iade/{oduncId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Odunc> kitapIadeAl(@PathVariable Long oduncId) {
-        return ResponseEntity.ok(oduncService.kitapIadeAl(oduncId));
+        return ResponseEntity.ok(oduncService.kitapIadeAl(oduncId, true));
     }
 
-    /*
-     * GET: http://localhost:8080/api/odunc/aktif
-     * Tüm aktif (iade edilmemiş) ödünç kayıtlarını getirir.
-     */
-    @GetMapping("/aktif")
-    public List<Odunc> aktifOduncleriGetir() {
-        return oduncService.tumAktifOduncleriGetir();
-    }
-
-    /*
-     * GET: http://localhost:8080/api/odunc
-     * Tüm ödünç kayıtlarını getirir (aktif ve iade edilmiş).
-     */
-    @GetMapping
-    public List<Odunc> tumOduncleriGetir() {
-        return oduncService.tumOduncleriGetir();
-    }
-
-    /*
-     * GET: http://localhost:8080/api/odunc/kullanici/{userId}
-     * Belirli bir kullanıcının aktif ödünç kayıtlarını getirir.
-     */
-    @GetMapping("/kullanici/{userId}")
-    public List<Odunc> kullaniciOduncleriGetir(@PathVariable Long userId) {
-        return oduncService.kullaniciOduncleriGetir(userId);
-    }
-
-    /*
-     * POST: http://localhost:8080/api/odunc/kullanici-iste?kitapId=1&userId=2
-     * Kullanıcıların kendi adına kitap ödünç istemesi için endpoint.
-     */
+    // 3. ÜYE ve PERSONEL: Kullanıcı kendi adına kitap ödünç talebi oluşturur
     @PostMapping("/kullanici-iste")
+    @PreAuthorize("hasAnyRole('UYE', 'PERSONEL')")
     public ResponseEntity<Odunc> kullaniciKitapOduncIste(
             @RequestParam Long kitapId,
             @RequestParam Long userId) {
-        // Bildirim oluşturma işlemi OduncService içinde yapılıyor (transaction içinde)
+        // Kanka burada userId'nin token'daki kişiyle aynı olduğunu kontrol eden
+        // bir mekanizma da eklenebilir ama şimdilik servise paslıyoruz.
         Odunc odunc = oduncService.kitapOduncVer(userId, kitapId, true);
         return new ResponseEntity<>(odunc, HttpStatus.CREATED);
     }
 
-    /*
-     * PUT: http://localhost:8080/api/odunc/kullanici-iade/{oduncId}
-     * Kullanıcıların kendi ödünçlerini iade etmesi için endpoint.
-     */
+    // 4. ADMIN ÖZEL: Tüm aktif (iade edilmemiş) ödünçleri listele
+    @GetMapping("/aktif")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<Odunc>> aktifOduncleriGetir() {
+        return ResponseEntity.ok(oduncService.tumAktifOduncleriGetir());
+    }
+
+    // 5. ÜYE ve PERSONEL: Giriş yapan kullanıcının kendi ödünçlerini getir
+    @GetMapping("/kullanici/{userId}")
+    public ResponseEntity<List<Odunc>> kullaniciOduncleriGetir(@PathVariable Long userId) {
+        return ResponseEntity.ok(oduncService.kullaniciOduncleriGetir(userId));
+    }
+
+    // 7. ÜYE ve PERSONEL: Kullanıcı kendi kitabını iade eder
     @PutMapping("/kullanici-iade/{oduncId}")
+    @PreAuthorize("hasAnyRole('UYE', 'PERSONEL')")
     public ResponseEntity<Odunc> kullaniciKitapIadeEt(@PathVariable Long oduncId) {
-        // Bildirim oluşturma işlemi OduncService içinde yapılıyor (transaction içinde)
-        Odunc oduncKaydi = oduncService.kitapIadeAl(oduncId, true);
-        return ResponseEntity.ok(oduncKaydi);
+        return ResponseEntity.ok(oduncService.kitapIadeAl(oduncId, true));
+    }
+
+    // 6. ADMIN ÖZEL: Tüm geçmiş kayıtları getir (sadece ödünç işlemleri)
+    @GetMapping("/tum-kayitlar")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<Odunc>> tumOduncleriGetir() {
+        return ResponseEntity.ok(oduncService.tumOduncleriGetir());
+    }
+
+    // 7. ADMIN ÖZEL: Tüm işlem loglarını getir (ödünç + kitap işlemleri)
+    @GetMapping("/tum-islem-loglari")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<IslemLogDTO>> tumIslemLoglariniGetir() {
+        return ResponseEntity.ok(tumIslemLoglariService.tumIslemLoglariniGetir());
     }
 }

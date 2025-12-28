@@ -6,7 +6,23 @@ let currentUserId = null;
 let currentUser = null;
 let userLoginModal = null;
 let updateUserInfoModal = null;
+let forgotPasswordModal = null;
 let pendingUserData = null; // Email doğrulaması için bekleyen kullanıcı verisi
+let userToken = null; // JWT token
+let forgotPasswordEmail = null; // Şifre sıfırlama için email
+
+// Token'dan auth header'ı oluştur
+function getAuthHeaders() {
+    const headers = {
+        'Content-Type': 'application/json'
+    };
+    
+    if (userToken) {
+        headers['Authorization'] = 'Bearer ' + userToken;
+    }
+    
+    return headers;
+}
 
 // Sayfa yüklendiğinde
 document.addEventListener('DOMContentLoaded', function() {
@@ -17,10 +33,13 @@ document.addEventListener('DOMContentLoaded', function() {
     if (fromAdminPage === 'true') {
         // Admin sayfasından geliyorsa, admin oturumunu temizle
         localStorage.removeItem('adminAuth');
+        localStorage.removeItem('adminToken');
         
         // Kullanıcı oturumunu da temizle (admin sayfasından geldiğinde)
+        localStorage.removeItem('userToken');
         localStorage.removeItem('kullaniciId');
         localStorage.removeItem('kullaniciEmail');
+        userToken = null;
         
         // Flag'i temizle
         sessionStorage.removeItem('fromAdminPage');
@@ -41,6 +60,12 @@ document.addEventListener('DOMContentLoaded', function() {
         updateUserInfoModal = new bootstrap.Modal(updateModalElement);
     }
     
+    // Şifre sıfırlama modal instance oluştur
+    const forgotPasswordModalElement = document.getElementById('forgotPasswordModal');
+    if (forgotPasswordModalElement) {
+        forgotPasswordModal = new bootstrap.Modal(forgotPasswordModalElement);
+    }
+    
     // Başlangıçta kullanıcı bilgileri dropdown'ını gizle ve giriş butonunu göster
     const dropdown = document.getElementById('userInfoDropdown');
     if (dropdown) {
@@ -53,13 +78,14 @@ document.addEventListener('DOMContentLoaded', function() {
         loginButton.style.display = 'inline-block';
     }
     
-    // Kaydedilmiş kullanıcı oturumunu kontrol et
-    const savedUserId = localStorage.getItem('kullaniciId');
-    const savedUserEmail = localStorage.getItem('kullaniciEmail');
+    // Kaydedilmiş token'ı kontrol et
+    const savedToken = localStorage.getItem('userToken');
+    const savedEmail = localStorage.getItem('kullaniciEmail');
     
-    if (savedUserId && savedUserEmail) {
+    if (savedToken && savedEmail) {
+        userToken = savedToken;
         // Kaydedilmiş oturum var, doğrulama yap
-        verifySavedSession(savedUserId, savedUserEmail);
+        verifySavedSession(null, savedEmail);
     } else {
         // Oturum yok, direkt kitapları göster (giriş yapmadan)
         showContentWithoutLogin();
@@ -155,33 +181,25 @@ function showUserLoginModal() {
     }
 }
 
-// Kullanıcı girişi (ID + E-posta/Telefon doğrulama)
+// Kullanıcı girişi (Email + Şifre ile token al)
 async function verifyUserLogin() {
-    const uyeNo = document.getElementById('uyeNoInput').value.trim();
-    const emailOrPhone = document.getElementById('userEmailOrPhoneInput').value.trim();
+    const email = document.getElementById('userEmailInput').value.trim();
+    const password = document.getElementById('userPasswordInput').value;
     const alertEl = document.getElementById('userLoginAlert');
     const loginBtn = document.getElementById('loginBtn');
     const spinner = loginBtn.querySelector('.spinner-border');
     
     // Validasyon
-    if (!uyeNo) {
+    if (!email) {
         alertEl.className = 'alert alert-warning';
-        alertEl.textContent = 'Lütfen üye numaranızı giriniz.';
+        alertEl.textContent = 'Lütfen e-posta adresinizi giriniz.';
         alertEl.classList.remove('d-none');
         return;
     }
     
-    // Üye numarası 6 haneli olmalı
-    if (!/^\d{6}$/.test(uyeNo)) {
+    if (!password) {
         alertEl.className = 'alert alert-warning';
-        alertEl.textContent = 'Üye numarası tam olarak 6 haneli olmalıdır (sadece rakam).';
-        alertEl.classList.remove('d-none');
-        return;
-    }
-    
-    if (!emailOrPhone) {
-        alertEl.className = 'alert alert-warning';
-        alertEl.textContent = 'Lütfen e-posta adresinizi veya telefon numaranızı giriniz.';
+        alertEl.textContent = 'Lütfen şifrenizi giriniz.';
         alertEl.classList.remove('d-none');
         return;
     }
@@ -192,51 +210,61 @@ async function verifyUserLogin() {
     alertEl.classList.add('d-none');
     
     try {
-        // Üye bilgilerini üye numarası ile getir
-        const response = await fetch(`${API_BASE_URL}/kullanicilar/uye-no/${uyeNo}`);
+        // Token al
+        const loginResponse = await fetch(`${API_BASE_URL}/auth/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                email: email,
+                password: password
+            })
+        });
         
-        if (!response.ok) {
-            if (response.status === 404) {
-                // Üye bulunamadı, "Üye Değil Misiniz?" linkini göster
-                alertEl.className = 'alert alert-warning';
-                alertEl.innerHTML = 'Üye bulunamadı! <a href="register.html" class="alert-link">Üye Değil Misiniz?</a>';
+        if (!loginResponse.ok) {
+            if (loginResponse.status === 401 || loginResponse.status === 403) {
+                alertEl.className = 'alert alert-danger';
+                alertEl.textContent = 'E-posta veya şifre hatalı!';
                 alertEl.classList.remove('d-none');
+                document.getElementById('userPasswordInput').value = '';
+                document.getElementById('userPasswordInput').focus();
                 return;
             }
-            throw new Error('Üye bilgileri alınamadı.');
+            throw new Error('Giriş yapılamadı.');
         }
         
-        const userData = await response.json();
+        const authData = await loginResponse.json();
+        userToken = authData.token;
         
-        // E-posta veya telefon doğrulama
-        const emailMatch = emailOrPhone.toLowerCase() === userData.email.toLowerCase();
-        const phoneMatch = userData.telefon && emailOrPhone.replace(/\D/g, '') === userData.telefon.replace(/\D/g, '');
+        // Token ile kullanıcı bilgilerini al (email ile)
+        const userResponse = await fetch(`${API_BASE_URL}/kullanici/email/${email}`, {
+            headers: getAuthHeaders()
+        });
         
-        if (!emailMatch && !phoneMatch) {
-            alertEl.className = 'alert alert-danger';
-            alertEl.textContent = 'E-posta adresi veya telefon numarası eşleşmiyor! Lütfen doğru bilgileri giriniz.';
-            alertEl.classList.remove('d-none');
-            document.getElementById('userEmailOrPhoneInput').value = '';
-            document.getElementById('userEmailOrPhoneInput').focus();
-            return;
+        if (!userResponse.ok) {
+            throw new Error('Kullanıcı bilgileri alınamadı.');
         }
+        
+        const userData = await userResponse.json();
         
         // Doğrulama başarılı, kullanıcıyı sisteme al
         currentUser = userData;
         currentUserId = currentUser.id;
         
-        // Oturum bilgilerini kaydet
+        // Token ve oturum bilgilerini kaydet
+        localStorage.setItem('userToken', userToken);
         localStorage.setItem('kullaniciId', currentUserId.toString());
         localStorage.setItem('kullaniciEmail', currentUser.email);
         
         // Modal'ı kapat
         userLoginModal.hide();
         
-        // İçeriği göster (zaten görünüyor olabilir)
+        // İçeriği göster
         document.getElementById('mainUserContent').style.display = 'block';
-        document.getElementById('userInfoCard').style.display = 'none'; // Kartı gizle, dropdown kullan
+        document.getElementById('userInfoCard').style.display = 'none';
         
-        // Kullanıcı bilgilerini göster (dropdown için)
+        // Kullanıcı bilgilerini göster
         updateUserInfoDropdown();
         
         // "Ödünç Aldığım Kitaplar" sekmesini göster
@@ -262,25 +290,27 @@ async function verifyUserLogin() {
     }
 }
 
-// Kaydedilmiş oturumu doğrula
+// Kaydedilmiş oturumu doğrula (Token ile)
 async function verifySavedSession(userId, email) {
     try {
-        const response = await fetch(`${API_BASE_URL}/kullanicilar/${userId}`);
+        // Token ile kullanıcı bilgilerini al (email ile)
+        const response = await fetch(`${API_BASE_URL}/kullanici/email/${email}`, {
+            headers: getAuthHeaders()
+        });
         
         if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+                // Token geçersiz, temizle
+                localStorage.removeItem('userToken');
+                localStorage.removeItem('kullaniciId');
+                localStorage.removeItem('kullaniciEmail');
+                userToken = null;
+                throw new Error('Token geçersiz');
+            }
             throw new Error('Kullanıcı bulunamadı');
         }
         
         const userData = await response.json();
-        
-        // Email kontrolü
-        if (userData.email.toLowerCase() !== email.toLowerCase()) {
-            // Email eşleşmiyor, oturumu temizle ve içeriği göster (giriş yapmadan)
-            localStorage.removeItem('kullaniciId');
-            localStorage.removeItem('kullaniciEmail');
-            showContentWithoutLogin();
-            return;
-        }
         
         // Oturum geçerli
         currentUser = userData;
@@ -288,9 +318,9 @@ async function verifySavedSession(userId, email) {
         
         // İçeriği göster
         document.getElementById('mainUserContent').style.display = 'block';
-        document.getElementById('userInfoCard').style.display = 'none'; // Kartı gizle, dropdown kullan
+        document.getElementById('userInfoCard').style.display = 'none';
         
-        // Kullanıcı bilgilerini göster (dropdown için)
+        // Kullanıcı bilgilerini göster
         updateUserInfoDropdown();
         
         // "Ödünç Aldığım Kitaplar" sekmesini göster
@@ -306,8 +336,10 @@ async function verifySavedSession(userId, email) {
     } catch (error) {
         console.error('Oturum doğrulama hatası:', error);
         // Oturum geçersiz, temizle ve içeriği göster (giriş yapmadan)
+        localStorage.removeItem('userToken');
         localStorage.removeItem('kullaniciId');
         localStorage.removeItem('kullaniciEmail');
+        userToken = null;
         showContentWithoutLogin();
     }
 }
@@ -342,8 +374,10 @@ function updateUserInfoDropdown() {
 // Kullanıcı çıkışı
 function userLogout() {
     if (confirm('Çıkış yapmak istediğinize emin misiniz?')) {
+        localStorage.removeItem('userToken');
         localStorage.removeItem('kullaniciId');
         localStorage.removeItem('kullaniciEmail');
+        userToken = null;
         currentUserId = null;
         currentUser = null;
         pendingUserData = null;
@@ -404,7 +438,9 @@ async function loadMyLoans() {
     noLoansMessage.style.display = 'none';
     
     try {
-        const response = await fetch(`${API_BASE_URL}/odunc/kullanici/${currentUserId}`);
+        const response = await fetch(`${API_BASE_URL}/odunc/kullanici/${currentUserId}`, {
+            headers: getAuthHeaders()
+        });
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -517,7 +553,7 @@ async function loadCatalog() {
     noCatalogMessage.style.display = 'none';
     
     try {
-        const response = await fetch(`${API_BASE_URL}/kitaplar`);
+        const response = await fetch(`${API_BASE_URL}/kitap`);
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -655,9 +691,7 @@ async function iadeEt(oduncId, kitapBaslik) {
     try {
         const response = await fetch(`${API_BASE_URL}/odunc/kullanici-iade/${oduncId}`, {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            }
+            headers: getAuthHeaders()
         });
         
         if (!response.ok) {
@@ -692,9 +726,7 @@ async function oduncAl(kitapId, kitapBaslik) {
     try {
         const response = await fetch(`${API_BASE_URL}/odunc/kullanici-iste?kitapId=${kitapId}&userId=${currentUserId}`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
+            headers: getAuthHeaders()
         });
         
         if (!response.ok) {
@@ -816,11 +848,9 @@ async function updateUserInfo() {
             telefon: telefon || null
         };
         
-        const response = await fetch(`${API_BASE_URL}/kullanicilar/kendi-bilgilerim/${currentUserId}`, {
+        const response = await fetch(`${API_BASE_URL}/kullanici/guncelle/${currentUserId}`, {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: getAuthHeaders(),
             body: JSON.stringify(updateData)
         });
         
@@ -854,6 +884,173 @@ async function updateUserInfo() {
         updateBtn.disabled = false;
         spinner.classList.remove('active');
     }
+}
+
+// Şifre sıfırlama modalını göster
+function showForgotPasswordModal(event) {
+    if (event) {
+        event.preventDefault();
+    }
+    
+    // Login modalını kapat
+    if (userLoginModal) {
+        userLoginModal.hide();
+    }
+    
+    // Formu sıfırla
+    resetForgotPasswordForm();
+    
+    // Şifre sıfırlama modalını göster
+    if (forgotPasswordModal) {
+        forgotPasswordModal.show();
+    } else {
+        console.error('forgotPasswordModal bulunamadı!');
+    }
+}
+
+// Şifre sıfırlama kodunu gönder
+async function sendPasswordResetCode() {
+    const email = document.getElementById('forgotPasswordEmailInput').value.trim();
+    const alertEl = document.getElementById('forgotPasswordAlert');
+    const sendBtn = document.getElementById('sendResetCodeBtn');
+    const spinner = sendBtn.querySelector('.spinner-border');
+    
+    if (!email) {
+        alertEl.className = 'alert alert-warning';
+        alertEl.textContent = 'Lütfen e-posta adresinizi giriniz.';
+        alertEl.classList.remove('d-none');
+        return;
+    }
+    
+    sendBtn.disabled = true;
+    spinner.classList.add('active');
+    alertEl.classList.add('d-none');
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/auth/forgot-password?email=${encodeURIComponent(email)}`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            forgotPasswordEmail = email;
+            // Step 2'ye geç
+            document.getElementById('forgotPasswordStep1').style.display = 'none';
+            document.getElementById('forgotPasswordStep2').style.display = 'block';
+            document.getElementById('forgotPasswordButtons1').style.display = 'none';
+            document.getElementById('forgotPasswordButtons2').style.display = 'block';
+        } else {
+            const errorData = await response.json().catch(() => ({ message: 'Bir hata oluştu' }));
+            throw new Error(errorData.message || 'Kod gönderilemedi');
+        }
+    } catch (error) {
+        console.error('Şifre sıfırlama hatası:', error);
+        alertEl.className = 'alert alert-danger';
+        alertEl.textContent = 'Hata: ' + error.message;
+        alertEl.classList.remove('d-none');
+    } finally {
+        sendBtn.disabled = false;
+        spinner.classList.remove('active');
+    }
+}
+
+// Şifreyi sıfırla
+async function resetPassword() {
+    const code = document.getElementById('resetCodeInput').value.trim();
+    const newPassword = document.getElementById('newPasswordInput').value;
+    const newPasswordConfirm = document.getElementById('newPasswordConfirmInput').value;
+    const alertEl = document.getElementById('resetPasswordAlert');
+    const resetBtn = document.getElementById('resetPasswordBtn');
+    const spinner = resetBtn.querySelector('.spinner-border');
+    
+    if (!code) {
+        alertEl.className = 'alert alert-warning';
+        alertEl.textContent = 'Lütfen şifre sıfırlama kodunu giriniz.';
+        alertEl.classList.remove('d-none');
+        return;
+    }
+    
+    if (!newPassword) {
+        alertEl.className = 'alert alert-warning';
+        alertEl.textContent = 'Lütfen yeni şifrenizi giriniz.';
+        alertEl.classList.remove('d-none');
+        return;
+    }
+    
+    if (newPassword.length < 6) {
+        alertEl.className = 'alert alert-warning';
+        alertEl.textContent = 'Şifre en az 6 karakter olmalıdır.';
+        alertEl.classList.remove('d-none');
+        return;
+    }
+    
+    if (newPassword !== newPasswordConfirm) {
+        alertEl.className = 'alert alert-warning';
+        alertEl.textContent = 'Şifreler eşleşmiyor.';
+        alertEl.classList.remove('d-none');
+        return;
+    }
+    
+    resetBtn.disabled = true;
+    spinner.classList.add('active');
+    alertEl.classList.add('d-none');
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `email=${encodeURIComponent(forgotPasswordEmail)}&code=${encodeURIComponent(code)}&newPassword=${encodeURIComponent(newPassword)}`
+        });
+        
+        if (response.ok) {
+            alertEl.className = 'alert alert-success';
+            alertEl.textContent = 'Şifreniz başarıyla sıfırlandı! Giriş yapabilirsiniz.';
+            alertEl.classList.remove('d-none');
+            
+            // 2 saniye sonra modalı kapat ve login modalını göster
+            setTimeout(() => {
+                if (forgotPasswordModal) {
+                    forgotPasswordModal.hide();
+                }
+                resetForgotPasswordForm();
+                if (userLoginModal) {
+                    userLoginModal.show();
+                }
+            }, 2000);
+        } else {
+            const errorData = await response.json().catch(() => ({ message: 'Bir hata oluştu' }));
+            throw new Error(errorData.message || 'Şifre sıfırlanamadı');
+        }
+    } catch (error) {
+        console.error('Şifre sıfırlama hatası:', error);
+        alertEl.className = 'alert alert-danger';
+        alertEl.textContent = 'Hata: ' + error.message;
+        alertEl.classList.remove('d-none');
+    } finally {
+        resetBtn.disabled = false;
+        spinner.classList.remove('active');
+    }
+}
+
+// Şifre sıfırlama formunu sıfırla
+function resetForgotPasswordForm() {
+    document.getElementById('forgotPasswordEmailInput').value = '';
+    document.getElementById('resetCodeInput').value = '';
+    document.getElementById('newPasswordInput').value = '';
+    document.getElementById('newPasswordConfirmInput').value = '';
+    document.getElementById('forgotPasswordAlert').classList.add('d-none');
+    document.getElementById('resetPasswordAlert').classList.add('d-none');
+    forgotPasswordEmail = null;
+    backToForgotPasswordStep1();
+}
+
+// Şifre sıfırlama Step 1'e geri dön
+function backToForgotPasswordStep1() {
+    document.getElementById('forgotPasswordStep1').style.display = 'block';
+    document.getElementById('forgotPasswordStep2').style.display = 'none';
+    document.getElementById('forgotPasswordButtons1').style.display = 'block';
+    document.getElementById('forgotPasswordButtons2').style.display = 'none';
 }
 
 // Admin sayfasına geç (kullanıcı oturumunu temizle)

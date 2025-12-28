@@ -8,7 +8,9 @@ let loginModal = null;
 let addBookModal = null;
 let deleteModal = null;
 let bookIdToDelete = null;
-let authCredentials = null;
+let authToken = null; // JWT token
+let sessionTimer = null; // Session timer interval
+let sessionExpiryTime = null; // Token expire zamanı
 
 // Sayfa yüklendiğinde
 document.addEventListener('DOMContentLoaded', function() {
@@ -68,35 +70,60 @@ document.addEventListener('DOMContentLoaded', function() {
     // (Sadece admin sayfasından kullanıcı sayfasına geçiş yapıldığında)
     // Sayfa yenilendiğinde oturum korunmalı, bu yüzden burada temizleme yapmıyoruz
     
-    // Kaydedilmiş auth bilgilerini kontrol et
-    const savedAuth = localStorage.getItem('adminAuth');
-    if (savedAuth) {
-        try {
-            authCredentials = JSON.parse(savedAuth);
-            // Auth bilgileriyle test isteği gönder
+    // Kaydedilmiş token'ı kontrol et
+    const savedToken = localStorage.getItem('adminToken');
+    if (savedToken) {
+        authToken = savedToken;
+        // Token expire zamanını kontrol et
+        if (isTokenExpired(authToken)) {
+            // Token süresi dolmuş
+            localStorage.removeItem('adminToken');
+            authToken = null;
+            // Modal instance'ın hazır olmasını bekle
+            setTimeout(() => {
+                showLoginModal();
+            }, 100);
+        } else {
+            // Token geçerli, timer başlat
+            startSessionTimer();
+            // Token ile test isteği gönder
             testAuth();
-        } catch (e) {
-            showLoginModal();
         }
     } else {
-        showLoginModal();
+        // Modal instance'ın hazır olmasını bekle
+        setTimeout(() => {
+            showLoginModal();
+        }, 100);
     }
     
     // Tab değiştiğinde ilgili verileri yükle
     const loansTab = document.getElementById('loans-tab');
-    loansTab.addEventListener('shown.bs.tab', function() {
-        loadLoans();
-    });
+    if (loansTab) {
+        loansTab.addEventListener('shown.bs.tab', function() {
+            loadLoans();
+        });
+    }
     
     const usersTab = document.getElementById('users-tab');
-    usersTab.addEventListener('shown.bs.tab', function() {
-        loadAllUsers();
-    });
+    if (usersTab) {
+        usersTab.addEventListener('shown.bs.tab', function() {
+            loadAllUsers();
+        });
+    }
+    
+    const logsTab = document.getElementById('logs-tab');
+    if (logsTab) {
+        logsTab.addEventListener('shown.bs.tab', function() {
+            loadAllLoans();
+        });
+    }
     
     const notificationsTab = document.getElementById('notifications-tab');
-    notificationsTab.addEventListener('shown.bs.tab', function() {
-        loadNotifications();
-    });
+    if (notificationsTab) {
+        notificationsTab.addEventListener('shown.bs.tab', function() {
+            loadNotifications();
+        });
+    }
     
     // Periyodik olarak bildirim sayısını kontrol et (30 saniyede bir)
     setInterval(checkNotificationCount, 30000);
@@ -112,7 +139,7 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Siliniyor...';
 
         try {
-            const response = await fetch(`${API_BASE_URL}/kitaplar/${bookIdToDelete}`, {
+            const response = await fetch(`${API_BASE_URL}/kitap/sil/${bookIdToDelete}`, {
                 method: 'DELETE',
                 headers: getAuthHeaders()
             });
@@ -142,30 +169,82 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Login modalını göster
 function showLoginModal() {
-    loginModal.show();
-    document.getElementById('mainContent').style.display = 'none';
+    // mainContent'i gizle
+    const mainContent = document.getElementById('mainContent');
+    if (mainContent) {
+        mainContent.style.display = 'none';
+    }
+    
+    // Modal'ı göster (eğer modal instance hazırsa)
+    if (loginModal) {
+        try {
+            loginModal.show();
+        } catch (error) {
+            console.error('Modal gösterilirken hata:', error);
+            // Modal henüz hazır değilse, modal elementini direkt kullan
+            const loginModalElement = document.getElementById('loginModal');
+            if (loginModalElement) {
+                const bsModal = new bootstrap.Modal(loginModalElement);
+                loginModal = bsModal;
+                bsModal.show();
+            }
+        }
+    } else {
+        // Modal instance yoksa oluştur
+        const loginModalElement = document.getElementById('loginModal');
+        if (loginModalElement) {
+            loginModal = new bootstrap.Modal(loginModalElement);
+            loginModal.show();
+        }
+    }
 }
 
-// Auth bilgilerini test et
+// Token'ı test et
 async function testAuth() {
     try {
-        const response = await fetch(`${API_BASE_URL}/kitaplar`, {
+        const response = await fetch(`${API_BASE_URL}/kitap`, {
             method: 'GET',
-            headers: {
-                'Authorization': 'Basic ' + btoa(authCredentials.username + ':' + authCredentials.password)
-            }
+            headers: getAuthHeaders()
         });
         
         if (response.ok) {
-            // Auth başarılı, içeriği göster
-            document.getElementById('mainContent').style.display = 'block';
-            loginModal.hide();
+            // Token geçerli, içeriği göster
+            // Önce modal'ı kapat
+            if (loginModal) {
+                try {
+                    loginModal.hide();
+                } catch (error) {
+                    console.error('Modal kapatılırken hata:', error);
+                }
+            }
+            
+            // Ana içeriği göster
+            const mainContent = document.getElementById('mainContent');
+            if (mainContent) {
+                mainContent.style.display = 'block';
+            }
+            
+            // Verileri yükle
             loadBooks();
             loadUsers(); // Ödünç verme modalı için
+            
+            // Timer başlat (eğer başlamadıysa)
+            if (!sessionTimer) {
+                startSessionTimer();
+            }
         } else if (response.status === 401) {
-            // Auth başarısız, login modalını göster
-            localStorage.removeItem('adminAuth');
-            authCredentials = null;
+            // Token geçersiz veya süresi dolmuş, login modalını göster
+            if (sessionTimer) {
+                clearInterval(sessionTimer);
+                sessionTimer = null;
+            }
+            const timerElement = document.getElementById('sessionTimer');
+            if (timerElement) {
+                timerElement.style.display = 'none';
+            }
+            localStorage.removeItem('adminToken');
+            authToken = null;
+            sessionExpiryTime = null;
             showLoginModal();
         }
     } catch (error) {
@@ -174,9 +253,9 @@ async function testAuth() {
     }
 }
 
-// Admin girişi
+// Admin girişi (Sabit kullanıcı adı/şifre ile)
 async function adminLogin() {
-    const username = document.getElementById('usernameInput').value;
+    const username = document.getElementById('usernameInput').value.trim();
     const password = document.getElementById('passwordInput').value;
     const alertEl = document.getElementById('loginAlert');
     const submitButton = document.querySelector('#loginModal .btn-primary');
@@ -195,18 +274,28 @@ async function adminLogin() {
     alertEl.classList.add('d-none');
     
     try {
-        // Test isteği gönder
-        const response = await fetch(`${API_BASE_URL}/kitaplar`, {
-            method: 'GET',
+        // Admin login endpoint'ine istek gönder
+        const response = await fetch(`${API_BASE_URL}/admin/login`, {
+            method: 'POST',
             headers: {
-                'Authorization': 'Basic ' + btoa(username + ':' + password)
-            }
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                username: username,
+                password: password
+            })
         });
         
         if (response.ok) {
-            // Başarılı giriş
-            authCredentials = { username: username, password: password };
-            localStorage.setItem('adminAuth', JSON.stringify(authCredentials));
+            // Token'ı al
+            const authResponse = await response.json();
+            authToken = authResponse.token;
+            
+            // Token'ı localStorage'a kaydet
+            localStorage.setItem('adminToken', authToken);
+            
+            // Token expire zamanını parse et ve timer başlat
+            startSessionTimer();
             
             alertEl.className = 'alert alert-success';
             alertEl.textContent = 'Giriş başarılı!';
@@ -223,7 +312,8 @@ async function adminLogin() {
             alertEl.textContent = 'Kullanıcı adı veya şifre hatalı!';
             alertEl.classList.remove('d-none');
         } else {
-            throw new Error('Giriş yapılamadı');
+            const errorData = await response.json().catch(() => ({ message: 'Giriş yapılamadı' }));
+            throw new Error(errorData.message || 'Giriş yapılamadı');
         }
     } catch (error) {
         console.error('Login hatası:', error);
@@ -236,11 +326,141 @@ async function adminLogin() {
     }
 }
 
+// Session timer'ı başlat
+function startSessionTimer() {
+    // Önce mevcut timer'ı temizle
+    if (sessionTimer) {
+        clearInterval(sessionTimer);
+    }
+    
+    // Token'ı decode et (JWT base64 formatında)
+    try {
+        const tokenParts = authToken.split('.');
+        if (tokenParts.length !== 3) {
+            console.error('Geçersiz token formatı');
+            return;
+        }
+        
+        // Payload'ı decode et
+        const payload = JSON.parse(atob(tokenParts[1]));
+        
+        // Expiration zamanını al (Unix timestamp - saniye cinsinden)
+        const exp = payload.exp;
+        sessionExpiryTime = exp * 1000; // JavaScript'te milisaniye cinsinden
+        
+        // Timer'ı göster
+        const timerElement = document.getElementById('sessionTimer');
+        if (timerElement) {
+            timerElement.style.display = 'inline-block';
+        }
+        
+        // Her saniye güncelle
+        updateTimer();
+        sessionTimer = setInterval(updateTimer, 1000);
+        
+    } catch (error) {
+        console.error('Token parse hatası:', error);
+    }
+}
+
+// Timer'ı güncelle
+function updateTimer() {
+    if (!sessionExpiryTime) return;
+    
+    const now = Date.now();
+    const remaining = sessionExpiryTime - now;
+    
+    if (remaining <= 0) {
+        // Süre doldu, otomatik logout
+        clearInterval(sessionTimer);
+        sessionTimer = null;
+        autoLogout();
+        return;
+    }
+    
+    // Kalan süreyi dakika:saniye formatında göster
+    const minutes = Math.floor(remaining / 60000);
+    const seconds = Math.floor((remaining % 60000) / 1000);
+    
+    const timerText = document.getElementById('timerText');
+    if (timerText) {
+        timerText.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+    
+    // Son 30 saniyede uyarı göster (kırmızı renk)
+    const timerElement = document.getElementById('sessionTimer');
+    if (timerElement) {
+        if (remaining <= 30000) {
+            timerElement.className = 'badge bg-danger text-white me-2';
+        } else {
+            timerElement.className = 'badge bg-warning text-dark me-2';
+        }
+    }
+}
+
+// Token'ın expire olup olmadığını kontrol et
+function isTokenExpired(token) {
+    try {
+        const tokenParts = token.split('.');
+        if (tokenParts.length !== 3) {
+            return true;
+        }
+        
+        const payload = JSON.parse(atob(tokenParts[1]));
+        const exp = payload.exp * 1000; // Milisaniye cinsinden
+        
+        return Date.now() >= exp;
+    } catch (error) {
+        console.error('Token parse hatası:', error);
+        return true;
+    }
+}
+
+// Otomatik logout
+function autoLogout() {
+    // Timer'ı gizle
+    const timerElement = document.getElementById('sessionTimer');
+    if (timerElement) {
+        timerElement.style.display = 'none';
+    }
+    
+    // Session bilgilerini temizle
+    localStorage.removeItem('adminToken');
+    authToken = null;
+    sessionExpiryTime = null;
+    
+    // Ana içeriği gizle
+    document.getElementById('mainContent').style.display = 'none';
+    
+    // Form alanlarını temizle
+    document.getElementById('usernameInput').value = '';
+    document.getElementById('passwordInput').value = '';
+    
+    // Uyarı göster
+    showAlert('Oturum süreniz doldu. Lütfen tekrar giriş yapın.', 'warning');
+    
+    // Login modalını göster
+    showLoginModal();
+}
+
 // Çıkış yap
 function logout() {
     if (confirm('Çıkış yapmak istediğinize emin misiniz?')) {
-        localStorage.removeItem('adminAuth');
-        authCredentials = null;
+        // Timer'ı temizle
+        if (sessionTimer) {
+            clearInterval(sessionTimer);
+            sessionTimer = null;
+        }
+        
+        // Timer'ı gizle
+        const timerElement = document.getElementById('sessionTimer');
+        if (timerElement) {
+            timerElement.style.display = 'none';
+        }
+        
+        localStorage.removeItem('adminToken');
+        authToken = null;
+        sessionExpiryTime = null;
         document.getElementById('mainContent').style.display = 'none';
         document.getElementById('usernameInput').value = '';
         document.getElementById('passwordInput').value = '';
@@ -268,37 +488,22 @@ function togglePasswordVisibility() {
 function switchToUserPage(event) {
     if (event) {
         event.preventDefault();
-    }
-    
-    // Modal açıksa kapat
-    if (loginModal) {
-        loginModal.hide();
-    }
-    
-    // Admin sayfasından kullanıcı sayfasına geçiş yapıldığını işaretle
-    sessionStorage.setItem('fromAdminPage', 'true');
-    
-    // Admin oturumunu temizle
-    localStorage.removeItem('adminAuth');
-    authCredentials = null;
-    
-    // Kullanıcı sayfasına yönlendir
-    window.location.href = 'user.html';
-    
-    if (event) {
-        event.preventDefault();
         event.stopPropagation();
     }
     
-    // Admin oturumunu temizle
-    localStorage.removeItem('adminAuth');
-    authCredentials = null;
+    // Timer'ı temizle
+    if (sessionTimer) {
+        clearInterval(sessionTimer);
+        sessionTimer = null;
+    }
     
-    // Kullanıcı oturumunu da temizle
-    localStorage.removeItem('kullaniciId');
-    localStorage.removeItem('kullaniciEmail');
+    // Timer'ı gizle
+    const timerElement = document.getElementById('sessionTimer');
+    if (timerElement) {
+        timerElement.style.display = 'none';
+    }
     
-    // Modal'ı kapat (eğer açıksa)
+    // Modal açıksa kapat
     if (loginModal) {
         try {
             loginModal.hide();
@@ -307,19 +512,31 @@ function switchToUserPage(event) {
         }
     }
     
+    // Admin sayfasından kullanıcı sayfasına geçiş yapıldığını işaretle
+    sessionStorage.setItem('fromAdminPage', 'true');
+    
+    // Admin oturumunu temizle
+    localStorage.removeItem('adminToken');
+    authToken = null;
+    sessionExpiryTime = null;
+    
+    // Kullanıcı oturumunu da temizle
+    localStorage.removeItem('kullaniciId');
+    localStorage.removeItem('kullaniciEmail');
+    localStorage.removeItem('userToken');
+    
     // Kullanıcı sayfasına yönlendir
-    console.log('user.html sayfasına yönlendiriliyor...');
     window.location.href = 'user.html';
 }
 
-// Auth header'ı ekle
+// Auth header'ı ekle (JWT Bearer Token)
 function getAuthHeaders() {
     const headers = {
         'Content-Type': 'application/json'
     };
     
-    if (authCredentials) {
-        headers['Authorization'] = 'Basic ' + btoa(authCredentials.username + ':' + authCredentials.password);
+    if (authToken) {
+        headers['Authorization'] = 'Bearer ' + authToken;
     }
     
     return headers;
@@ -337,7 +554,7 @@ async function loadBooks() {
     noBooksMessage.style.display = 'none';
     
     try {
-        const response = await fetch(`${API_BASE_URL}/kitaplar`, {
+        const response = await fetch(`${API_BASE_URL}/kitap`, {
             headers: getAuthHeaders()
         });
         
@@ -431,7 +648,7 @@ function createBookCard(kitap) {
 // Kullanıcıları yükle
 async function loadUsers() {
     try {
-        const response = await fetch(`${API_BASE_URL}/kullanicilar/uyeler`, {
+        const response = await fetch(`${API_BASE_URL}/kullanici/uyeler`, {
             headers: getAuthHeaders()
         });
         
@@ -615,6 +832,140 @@ async function loadLoans() {
     }
 }
 
+// Tüm işlem loglarını yükle (ödünç + kitap işlemleri)
+async function loadAllLoans() {
+    const loadingEl = document.getElementById('loadingLogs');
+    const logsContainer = document.getElementById('logsContainer');
+    const noLogsMessage = document.getElementById('noLogsMessage');
+    
+    // Loading göster
+    loadingEl.style.display = 'block';
+    logsContainer.style.display = 'none';
+    noLogsMessage.style.display = 'none';
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/odunc/tum-islem-loglari`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const islemLoglari = await response.json();
+        
+        // Loading gizle
+        loadingEl.style.display = 'none';
+        
+        if (islemLoglari.length === 0) {
+            noLogsMessage.style.display = 'block';
+            document.getElementById('totalLogsCount').textContent = '0 kayıt';
+        } else {
+            logsContainer.style.display = 'block';
+            renderAllLogs(islemLoglari);
+            document.getElementById('totalLogsCount').textContent = `${islemLoglari.length} kayıt`;
+        }
+    } catch (error) {
+        console.error('İşlem logları yüklenirken hata oluştu:', error);
+        loadingEl.style.display = 'none';
+        
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+            showAlert('Backend sunucusuna bağlanılamıyor. Lütfen backend\'in çalıştığından emin olun (http://localhost:8080)', 'danger');
+        } else {
+            showAlert('İşlem logları yüklenirken bir hata oluştu: ' + error.message, 'danger');
+        }
+    }
+}
+
+// Tüm işlem loglarını render et (ödünç + kitap işlemleri)
+function renderAllLogs(islemLoglari) {
+    const container = document.getElementById('logsContainer');
+    container.innerHTML = '';
+    
+    const table = document.createElement('table');
+    table.className = 'table table-hover';
+    table.innerHTML = `
+        <thead>
+            <tr>
+                <th>İşlem Tipi</th>
+                <th>Kitap</th>
+                <th>Yazar</th>
+                <th>ISBN</th>
+                <th>Kullanıcı</th>
+                <th>Tarih</th>
+                <th>Durum</th>
+            </tr>
+        </thead>
+        <tbody id="logsTableBody">
+        </tbody>
+    `;
+    
+    container.appendChild(table);
+    const tbody = document.getElementById('logsTableBody');
+    
+    islemLoglari.forEach(log => {
+        const tr = document.createElement('tr');
+        
+        // İşlem tipi badge'i
+        let islemTipiBadge = '';
+        switch(log.islemTipi) {
+            case 'ODUNC_VER':
+                islemTipiBadge = '<span class="badge bg-primary"><i class="bi bi-bookmark-plus"></i> Ödünç Verildi</span>';
+                break;
+            case 'ODUNC_IADE':
+                islemTipiBadge = '<span class="badge bg-success"><i class="bi bi-check-circle"></i> İade Edildi</span>';
+                break;
+            case 'KITAP_EKLE':
+                islemTipiBadge = '<span class="badge bg-info"><i class="bi bi-plus-circle"></i> Kitap Eklendi</span>';
+                break;
+            case 'KITAP_SIL':
+                islemTipiBadge = '<span class="badge bg-danger"><i class="bi bi-trash"></i> Kitap Silindi</span>';
+                break;
+            default:
+                islemTipiBadge = '<span class="badge bg-secondary">' + escapeHtml(log.islemTipi) + '</span>';
+        }
+        
+        // Tarih formatı
+        let tarihText = '';
+        if (log.islemTarihi) {
+            const tarih = new Date(log.islemTarihi);
+            tarihText = tarih.toLocaleString('tr-TR', { 
+                year: 'numeric', 
+                month: '2-digit', 
+                day: '2-digit', 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+        }
+        
+        // Kullanıcı bilgisi (ödünç işlemleri için)
+        let kullaniciText = '<span class="text-muted">-</span>';
+        if (log.kullaniciAdSoyad) {
+            kullaniciText = `${escapeHtml(log.kullaniciAdSoyad)}<br><small class="text-muted">${escapeHtml(log.kullaniciEmail)}</small>`;
+        }
+        
+        // Durum (ödünç işlemleri için)
+        let durumText = '<span class="text-muted">-</span>';
+        if (log.islemTipi === 'ODUNC_VER') {
+            durumText = '<span class="badge bg-warning">Aktif</span>';
+        } else if (log.islemTipi === 'ODUNC_IADE') {
+            durumText = '<span class="badge bg-success">Tamamlandı</span>';
+        }
+        
+        tr.innerHTML = `
+            <td>${islemTipiBadge}</td>
+            <td><strong>${escapeHtml(log.kitapBaslik)}</strong></td>
+            <td>${escapeHtml(log.kitapYazar)}</td>
+            <td><code>${escapeHtml(log.kitapIsbn)}</code></td>
+            <td>${kullaniciText}</td>
+            <td>${tarihText}</td>
+            <td>${durumText}</td>
+        `;
+        
+        tbody.appendChild(tr);
+    });
+}
+
 // Ödünç kayıtlarını render et
 function renderLoans(oduncler) {
     const container = document.getElementById('loansContainer');
@@ -761,7 +1112,7 @@ async function loadAllUsers() {
     try {
         // Kullanıcıları ve aktif ödünçleri paralel olarak yükle
         const [usersResponse, loansResponse] = await Promise.all([
-            fetch(`${API_BASE_URL}/kullanicilar`, { headers: getAuthHeaders() }),
+            fetch(`${API_BASE_URL}/kullanici/hepsi`, { headers: getAuthHeaders() }),
             fetch(`${API_BASE_URL}/odunc/aktif`, { headers: getAuthHeaders() })
         ]);
         
@@ -882,7 +1233,7 @@ function renderUsers(users) {
         }
         
         const tipBadge = userType === 'UYE' ? '<span class="badge bg-success">Üye</span>' : '<span class="badge bg-info">Personel</span>';
-        const maxLimit = userType === 'UYE' ? 3 : 5;
+        const maxLimit = userType === 'UYE' ? 3 : 10; // Personel limiti 10 olmalı (Personel.java'da 10 olarak tanımlı)
         // Personeller için departman bilgisini tip badge'inin yanına ekle
         const tipWithDept = userType === 'PERSONEL' && user.departman 
             ? `${tipBadge}<br><small class="text-muted">${escapeHtml(user.departman)}</small>` 
@@ -912,17 +1263,58 @@ function renderUsers(users) {
             }
         }
         
+        // Tip değiştirme butonları
+        let tipChangeButtons = '';
+        if (userType === 'UYE') {
+            tipChangeButtons = `<button class="btn btn-sm btn-outline-info" onclick="changeUserType(${user.id}, 'PERSONEL')" title="Personel yap">
+                <i class="bi bi-person-badge"></i> Personel Yap
+            </button>`;
+        } else {
+            tipChangeButtons = `<button class="btn btn-sm btn-outline-success" onclick="changeUserType(${user.id}, 'UYE')" title="Üye yap">
+                <i class="bi bi-person"></i> Üye Yap
+            </button>`;
+        }
+        
         tr.innerHTML = `
             <td><strong>#${user.id}</strong></td>
             <td>${escapeHtml(user.adSoyad)}${yeniBadge}</td>
             <td>${escapeHtml(user.email)}</td>
             <td>${escapeHtml(user.telefon || '-')}</td>
-            <td>${tipWithDept}</td>
+            <td>${tipWithDept}<br>${tipChangeButtons}</td>
             <td>${limitDisplay}</td>
         `;
         
         tbody.appendChild(tr);
     });
+}
+
+// Kullanıcı tipini değiştir
+async function changeUserType(userId, newType) {
+    if (!confirm(`Bu kullanıcının tipini ${newType === 'UYE' ? 'Üye' : 'Personel'} olarak değiştirmek istediğinize emin misiniz?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/kullanici/tip-degistir/${userId}?yeniTip=${newType}`, {
+            method: 'PUT',
+            headers: getAuthHeaders()
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Bir hata oluştu' }));
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const updatedUser = await response.json();
+        showAlert(`Kullanıcı tipi başarıyla ${newType === 'UYE' ? 'Üye' : 'Personel'} olarak değiştirildi!`, 'success');
+        
+        // Kullanıcı listesini yenile
+        loadAllUsers();
+        
+    } catch (error) {
+        console.error('Kullanıcı tipi değiştirme hatası:', error);
+        showAlert('Hata: ' + error.message, 'danger');
+    }
 }
 
 // Kullanıcı listesini filtrele
@@ -985,8 +1377,10 @@ function refreshCurrentPage() {
     
     if (booksTab.classList.contains('active')) {
         loadBooks();
-    } else if (loansTab.classList.contains('active')) {
+    } else     if (loansTab.classList.contains('active')) {
         loadLoans();
+    } else if (logsTab && logsTab.classList.contains('active')) {
+        loadAllLoans();
     } else if (usersTab.classList.contains('active')) {
         loadAllUsers();
     }
@@ -1003,7 +1397,7 @@ async function loadNotifications() {
     noNotificationsMessage.style.display = 'none';
     
     try {
-        const response = await fetch(`${API_BASE_URL}/kullanicilar/bildirimler`, {
+        const response = await fetch(`${API_BASE_URL}/bildirim`, {
             headers: getAuthHeaders()
         });
         
@@ -1079,7 +1473,7 @@ function renderNotifications(bildirimler) {
 // Okunmamış bildirim sayısını kontrol et
 async function checkNotificationCount() {
     try {
-        const response = await fetch(`${API_BASE_URL}/kullanicilar/bildirimler/okunmamis-sayisi`, {
+        const response = await fetch(`${API_BASE_URL}/bildirim/okunmamis-sayisi`, {
             headers: getAuthHeaders()
         });
         
@@ -1103,8 +1497,8 @@ async function checkNotificationCount() {
 // Bildirimi okundu olarak işaretle
 async function markNotificationAsRead(bildirimId) {
     try {
-        const response = await fetch(`${API_BASE_URL}/kullanicilar/bildirimler/${bildirimId}/okundu`, {
-            method: 'PUT',
+        const response = await fetch(`${API_BASE_URL}/bildirim/oku/${bildirimId}`, {
+            method: 'POST',
             headers: getAuthHeaders()
         });
         
@@ -1121,8 +1515,8 @@ async function markNotificationAsRead(bildirimId) {
 // Tüm bildirimleri okundu olarak işaretle
 async function markAllNotificationsAsRead() {
     try {
-        const response = await fetch(`${API_BASE_URL}/kullanicilar/bildirimler/tumunu-okundu`, {
-            method: 'PUT',
+        const response = await fetch(`${API_BASE_URL}/bildirim/hepsini-oku`, {
+            method: 'POST',
             headers: getAuthHeaders()
         });
         
@@ -1289,7 +1683,7 @@ async function addBook() {
             mevcut: true
         };
         
-        const response = await fetch(`${API_BASE_URL}/kitaplar`, {
+        const response = await fetch(`${API_BASE_URL}/kitap/ekle`, {
             method: 'POST',
             headers: {
                 ...getAuthHeaders(),
