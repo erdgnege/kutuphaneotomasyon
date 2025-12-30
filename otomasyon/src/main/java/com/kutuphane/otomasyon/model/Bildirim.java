@@ -1,7 +1,11 @@
 package com.kutuphane.otomasyon.model;
 
+import lombok.Getter;
+import lombok.Setter;
 import java.time.LocalDateTime;
 
+@Getter
+@Setter
 public class Bildirim {
     private Long id;
     private Long kullaniciId;
@@ -21,52 +25,4 @@ public class Bildirim {
         this.okundu = false;
     }
 
-    // Getters and Setters
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public Long getKullaniciId() {
-        return kullaniciId;
-    }
-
-    public void setKullaniciId(Long kullaniciId) {
-        this.kullaniciId = kullaniciId;
-    }
-
-    public String getKullaniciAdi() {
-        return kullaniciAdi;
-    }
-
-    public void setKullaniciAdi(String kullaniciAdi) {
-        this.kullaniciAdi = kullaniciAdi;
-    }
-
-    public String getMesaj() {
-        return mesaj;
-    }
-
-    public void setMesaj(String mesaj) {
-        this.mesaj = mesaj;
-    }
-
-    public LocalDateTime getOlusturmaTarihi() {
-        return olusturmaTarihi;
-    }
-
-    public void setOlusturmaTarihi(LocalDateTime olusturmaTarihi) {
-        this.olusturmaTarihi = olusturmaTarihi;
-    }
-
-    public boolean isOkundu() {
-        return okundu;
-    }
-
-    public void setOkundu(boolean okundu) {
-        this.okundu = okundu;
-    }
 }

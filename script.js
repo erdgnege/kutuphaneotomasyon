@@ -648,7 +648,7 @@ function createBookCard(kitap) {
 // Kullanıcıları yükle
 async function loadUsers() {
     try {
-        const response = await fetch(`${API_BASE_URL}/kullanici/uyeler`, {
+        const response = await fetch(`${API_BASE_URL}/kullanicilar/uyeler`, {
             headers: getAuthHeaders()
         });
         
@@ -1112,7 +1112,7 @@ async function loadAllUsers() {
     try {
         // Kullanıcıları ve aktif ödünçleri paralel olarak yükle
         const [usersResponse, loansResponse] = await Promise.all([
-            fetch(`${API_BASE_URL}/kullanici/hepsi`, { headers: getAuthHeaders() }),
+            fetch(`${API_BASE_URL}/kullanicilar/hepsi`, { headers: getAuthHeaders() }),
             fetch(`${API_BASE_URL}/odunc/aktif`, { headers: getAuthHeaders() })
         ]);
         
@@ -1295,7 +1295,7 @@ async function changeUserType(userId, newType) {
     }
     
     try {
-        const response = await fetch(`${API_BASE_URL}/kullanici/tip-degistir/${userId}?yeniTip=${newType}`, {
+        const response = await fetch(`${API_BASE_URL}/kullanicilar/tip-degistir/${userId}?yeniTip=${newType}`, {
             method: 'PUT',
             headers: getAuthHeaders()
         });
@@ -1610,17 +1610,18 @@ async function searchGoogleBooks() {
 
 // Google Books'tan seçilen kitabı forma doldur
 function selectGoogleBook(title, author, isbn, kapakUrl) {
-    document.getElementById('bookBaslik').value = title;
-    document.getElementById('bookYazar').value = author;
-    document.getElementById('bookIsbn').value = isbn;
-    document.getElementById('bookKapakUrl').value = kapakUrl || '';
+    // Google sekmesindeki form alanlarını doldur
+    document.getElementById('bookBaslikGoogle').value = title;
+    document.getElementById('bookYazarGoogle').value = author;
+    document.getElementById('bookIsbnGoogle').value = isbn;
+    document.getElementById('bookKapakUrlGoogle').value = kapakUrl || '';
     
     // Arama sonuçlarını gizle
     document.getElementById('googleBooksResults').style.display = 'none';
     document.getElementById('googleBookSearch').value = '';
     
     // Form alanlarına odaklan
-    document.getElementById('bookBaslik').focus();
+    document.getElementById('bookBaslikGoogle').focus();
 }
 
 // XSS koruması için HTML escape
@@ -1633,24 +1634,49 @@ function escapeHtml(text) {
 
 // Kitap ekleme modal'ını göster
 function showAddBookModal() {
-    // Formu temizle
+    // Formları temizle
     document.getElementById('addBookForm').reset();
+    document.getElementById('addBookFormGoogle').reset();
     document.getElementById('googleBookSearch').value = '';
     document.getElementById('googleBooksResults').style.display = 'none';
     document.getElementById('googleBooksResults').innerHTML = '';
-    document.getElementById('bookKapakUrl').value = '';
     document.getElementById('addBookAlert').classList.add('d-none');
+    
+    // İlk sekmeye geç (Manuel Ekleme)
+    const manualTab = document.getElementById('manual-tab');
+    if (manualTab) {
+        const tab = new bootstrap.Tab(manualTab);
+        tab.show();
+    }
+
     addBookModal.show();
 }
 
 // Kitap ekle
 async function addBook() {
-    const baslik = document.getElementById('bookBaslik').value.trim();
-    const yazar = document.getElementById('bookYazar').value.trim();
-    const isbn = document.getElementById('bookIsbn').value.trim();
     const alertEl = document.getElementById('addBookAlert');
     const addBookBtn = document.getElementById('addBookBtn');
     const spinner = document.getElementById('addBookSpinner');
+    
+    // Hangi sekme aktif mi kontrol et
+    const manualTab = document.getElementById('manual-tab');
+    const isManualTab = manualTab && manualTab.classList.contains('active');
+    
+    let baslik, yazar, isbn, kapakUrl;
+    
+    if (isManualTab) {
+        // Manuel ekleme sekmesi
+        baslik = document.getElementById('bookBaslik').value.trim();
+        yazar = document.getElementById('bookYazar').value.trim();
+        isbn = document.getElementById('bookIsbn').value.trim();
+        kapakUrl = document.getElementById('bookKapakUrl').value.trim();
+    } else {
+        // Google Books sekmesi
+        baslik = document.getElementById('bookBaslikGoogle').value.trim();
+        yazar = document.getElementById('bookYazarGoogle').value.trim();
+        isbn = document.getElementById('bookIsbnGoogle').value.trim();
+        kapakUrl = document.getElementById('bookKapakUrlGoogle').value.trim();
+    }
     
     // Validasyon
     if (!baslik) {
@@ -1674,7 +1700,6 @@ async function addBook() {
     alertEl.classList.add('d-none');
     
     try {
-        const kapakUrl = document.getElementById('bookKapakUrl').value.trim();
         const kitapData = {
             baslik: baslik,
             yazar: yazar,

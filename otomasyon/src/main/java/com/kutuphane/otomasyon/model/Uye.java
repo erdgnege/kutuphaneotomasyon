@@ -1,7 +1,11 @@
 package com.kutuphane.otomasyon.model;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
+@Getter
+@Setter
 @Entity
 @DiscriminatorValue("UYE")
 public class Uye extends Kullanici {
@@ -9,12 +13,12 @@ public class Uye extends Kullanici {
     @Column(unique = true, length = 6, nullable = false)
     private String uyeNo;
 
-    // Boş constructor kanka, JPA'nın içi rahat etsin
+    // Boş constructor (JPA için gerekli)
     public Uye() {
         super();
     }
 
-    // Kanka buraya da 'sifre' ekledik, kayıt olurken lazım olacak
+    // Parametreli constructor (kayıt işlemi için)
     public Uye(String adSoyad, String email, String sifre, String uyeNo) {
         super(adSoyad, email, sifre);
         this.uyeNo = uyeNo;
@@ -23,13 +27,5 @@ public class Uye extends Kullanici {
     @Override
     public int oduncAlmaLimitiHesapla() {
         return 3;
-    }
-
-    public String getUyeNo() {
-        return uyeNo;
-    }
-
-    public void setUyeNo(String uyeNo) {
-        this.uyeNo = uyeNo;
     }
 }

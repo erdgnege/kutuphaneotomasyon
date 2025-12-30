@@ -1,0 +1,241 @@
+@startuml Kütüphane Otomasyon Sistemi - Detaylı Master Diyagram
+
+' --- GÖRSEL AYARLAR ---
+skinparam classAttributeIconSize 0
+skinparam monochrome false
+skinparam packageStyle rectangle
+skinparam shadowing true
+
+' --- MODEL / ENTITY LAYER ---
+package "com.kutuphane.otomasyon.model" {
+    abstract class Kullanici {
+        - Long id
+        - String adSoyad
+        - String email
+        - String sifre
+        - String telefon
+        - LocalDateTime kayitTarihi
+        + Collection<? extends GrantedAuthority> getAuthorities()
+        + String getPassword()
+        + String getUsername()
+        + boolean isAccountNonExpired()
+        + boolean isAccountNonLocked()
+        + boolean isCredentialsNonExpired()
+        + boolean isEnabled()
+        {abstract} + int oduncAlmaLimitiHesapla()
+    }
+
+    class Uye {
+        - String uyeNo
+        + int oduncAlmaLimitiHesapla() ' return 3
+    }
+
+    class Personel {
+        - String sicilNo
+        - String departman
+        + int oduncAlmaLimitiHesapla() ' return 10
+    }
+
+    class Kitap {
+        - Long id
+        - String baslik
+        - String yazar
+        - String isbn
+        - String kapakUrl
+        - boolean mevcut
+    }
+
+    class Odunc {
+        - Long id
+        - Kitap kitap
+        - Kullanici kullanici
+        - LocalDate oduncTarihi
+        - LocalDate teslimTarihi
+    }
+
+    class IslemLog {
+        - Long id
+        - IslemTipi islemTipi
+        - Kitap kitap
+        - String kitapBaslik
+        - String kitapIsbn
+        - String kitapYazar
+        - LocalDateTime islemTarihi
+    }
+
+    enum IslemTipi {
+        KITAP_EKLE
+        KITAP_SIL
+    }
+
+    class Bildirim {
+        - Long id
+        - Long kullaniciId
+        - String kullaniciAdi
+        - String mesaj
+        - LocalDateTime olusturmaTarihi
+        - boolean okundu
+    }
+}
+
+' --- REPOSITORY LAYER ---
+package "com.kutuphane.otomasyon.repository" {
+    interface KitapRepository <<Interface>> {
+        + findByIsbn(String isbn)
+    }
+    interface KullaniciRepository <<Interface>> {
+        + findByEmail(String email)
+        + findByTelefon(String telefon)
+        + findByUyeNo(String uyeNo)
+        + findAllUyeler()
+        + findAllPersoneller()
+    }
+    interface OduncRepository <<Interface>> {
+        + findByKullaniciIdAndTeslimTarihiIsNull(Long userId)
+        + findAllAktifOduncler()
+        + deleteByKitapId(Long id)
+    }
+    interface IslemLogRepository <<Interface>>
+}
+
+' --- CONFIG & SECURITY LAYER ---
+package "com.kutuphane.otomasyon.config" {
+    class ApplicationConfig {
+        - KullaniciRepository repository
+        + UserDetailsService userDetailsService()
+        + AuthenticationProvider authenticationProvider()
+        + AuthenticationManager authenticationManager()
+        + PasswordEncoder passwordEncoder()
+    }
+
+    class SecurityConfig {
+        - JwtAuthenticationFilter jwtAuthFilter
+        - AuthenticationProvider authenticationProvider
+        + SecurityFilterChain securityFilterChain(HttpSecurity)
+    }
+
+    class JwtAuthenticationFilter {
+        - JwtService jwtService
+        - UserDetailsService userDetailsService
+        # doFilterInternal(request, response, filterChain)
+    }
+}
+
+' --- SERVICE LAYER ---
+package "com.kutuphane.otomasyon.service" {
+    class JwtService {
+        - String secretKey
+        + String extractUsername(token)
+        + String generateToken(UserDetails)
+        + boolean isTokenValid(token, UserDetails)
+    }
+
+    class AuthenticationService {
+        - KullaniciRepository repository
+        - PasswordEncoder passwordEncoder
+        - JwtService jwtService
+        - AuthenticationManager authManager
+        + AuthResponse register(request)
+        + AuthResponse authenticate(request)
+    }
+
+    class KitapService {
+        - KitapRepository kitapRepo
+        - IslemLogService logService
+        + Kitap kitapEkle(Kitap)
+        + void kitapSil(Long id)
+    }
+
+    class OduncService {
+        - OduncRepository oduncRepo
+        - BildirimService bildirimService
+        - EntityManager entityManager
+        + Odunc kitapOduncVer(userId, kitapId, bildirimOlustur)
+        + Odunc kitapIadeAl(oduncId, bildirimOlustur)
+    }
+
+    class KullaniciService {
+        - KullaniciRepository kullaniciRepo
+        - EntityManager entityManager
+        + Kullanici kullaniciKaydet(Kullanici)
+        + Kullanici kullaniciTipiniDegistir(Long id, String yeniTip)
+    }
+
+    class EmailService {
+        - JavaMailSender mailSender
+        + void sendVerificationCode(String to, String code)
+        + void sendPasswordResetCode(String to, String code)
+    }
+
+    class BildirimService {
+        - ConcurrentLinkedQueue<Bildirim> bildirimler
+        + void bildirimOlustur(Long userId, String userAdi, String mesaj)
+    }
+}
+
+' --- CONTROLLER & DTO LAYER ---
+package "com.kutuphane.otomasyon.controller" {
+    class AuthController {
+        + ResponseEntity login(AuthRequest)
+        + ResponseEntity register(request)
+    }
+    class KitapController {
+        + List<Kitap> getAll()
+        + Kitap save(Kitap)
+    }
+    class OduncController {
+        + ResponseEntity oduncVer(kitapId, userId)
+        + ResponseEntity iadeAl(oduncId)
+    }
+}
+
+package "com.kutuphane.otomasyon.dto" {
+    class AuthRequest {
+        - String email
+        - String password
+    }
+    class AuthResponse {
+        - String token
+    }
+    class IslemLogDTO {
+        - String kitapBaslik
+        - String islemTipi
+    }
+}
+
+' --- EXCEPTION LAYER ---
+package "com.kutuphane.otomasyon.exception" {
+    class KutuphaneHatasi {
+        + KutuphaneHatasi(String message)
+    }
+    class GlobalExceptionHandler {
+        + handleKutuphaneHatasi(KutuphaneHatasi)
+    }
+}
+
+' --- İLİŞKİLER (RELATIONSHIPS) ---
+
+' Kalıtım ve Security
+Kullanici <|-- Uye
+Kullanici <|-- Personel
+SecurityConfig ..> JwtAuthenticationFilter
+JwtAuthenticationFilter --> JwtService
+
+' Servis ve Repo Bağlantıları
+KitapService --> KitapRepository
+OduncService --> OduncRepository
+KullaniciService --> KullaniciRepository
+AuthenticationService --> JwtService
+
+' Business Logic İlişkileri
+Odunc "n" -- "1" Kitap
+Odunc "n" -- "1" Kullanici
+OduncService ..> BildirimService
+KitapService ..> IslemLogService
+
+' API ve Veri Akışı
+AuthController --> AuthenticationService
+KitapController --> KitapService
+OduncController --> OduncService
+
+@enduml

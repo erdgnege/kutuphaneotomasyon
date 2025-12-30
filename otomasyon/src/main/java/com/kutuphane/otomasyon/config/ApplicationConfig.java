@@ -21,8 +21,7 @@ public class ApplicationConfig {
 
     @Bean
     public UserDetailsService userDetailsService() {
-        // Kanka burada Spring'e diyoruz ki:
-        // "Birisi giriş yapmaya çalıştığında git bizim repository'den email ile bul"
+        // Kullanıcı adı (email) ile repository'den kullanıcı bulunur
         return username -> repository.findByEmail(username)
                 .orElseThrow(() -> new UsernameNotFoundException("Kullanıcı bulunamadı, email: " + username));
     }
@@ -43,7 +42,7 @@ public class ApplicationConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        // Şifreleri veritabanında açık halde tutmuyoruz kanka, BCrypt ile maskeliyoruz
+        // Şifreler BCrypt ile encode edilir
         return new BCryptPasswordEncoder();
     }
 }

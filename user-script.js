@@ -181,18 +181,18 @@ function showUserLoginModal() {
     }
 }
 
-// Kullanıcı girişi (Email + Şifre ile token al)
+// Kullanıcı girişi (Email veya Üye No + Şifre ile token al)
 async function verifyUserLogin() {
-    const email = document.getElementById('userEmailInput').value.trim();
+    const emailOrUyeNo = document.getElementById('userEmailInput').value.trim();
     const password = document.getElementById('userPasswordInput').value;
     const alertEl = document.getElementById('userLoginAlert');
     const loginBtn = document.getElementById('loginBtn');
     const spinner = loginBtn.querySelector('.spinner-border');
     
     // Validasyon
-    if (!email) {
+    if (!emailOrUyeNo) {
         alertEl.className = 'alert alert-warning';
-        alertEl.textContent = 'Lütfen e-posta adresinizi giriniz.';
+        alertEl.textContent = 'Lütfen e-posta adresinizi veya üye numaranızı giriniz.';
         alertEl.classList.remove('d-none');
         return;
     }
@@ -210,14 +210,14 @@ async function verifyUserLogin() {
     alertEl.classList.add('d-none');
     
     try {
-        // Token al
+        // Token al (email alanına email veya üye no gönderilebilir)
         const loginResponse = await fetch(`${API_BASE_URL}/auth/login`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                email: email,
+                email: emailOrUyeNo, // Backend'de email veya üye no olarak işlenecek
                 password: password
             })
         });
@@ -225,7 +225,7 @@ async function verifyUserLogin() {
         if (!loginResponse.ok) {
             if (loginResponse.status === 401 || loginResponse.status === 403) {
                 alertEl.className = 'alert alert-danger';
-                alertEl.textContent = 'E-posta veya şifre hatalı!';
+                alertEl.textContent = 'E-posta/Üye No veya şifre hatalı!';
                 alertEl.classList.remove('d-none');
                 document.getElementById('userPasswordInput').value = '';
                 document.getElementById('userPasswordInput').focus();
@@ -237,16 +237,29 @@ async function verifyUserLogin() {
         const authData = await loginResponse.json();
         userToken = authData.token;
         
-        // Token ile kullanıcı bilgilerini al (email ile)
-        const userResponse = await fetch(`${API_BASE_URL}/kullanici/email/${email}`, {
-            headers: getAuthHeaders()
-        });
+        // Kullanıcı bilgilerini al - önce email ile dene, sonra üye no ile
+        let userData = null;
+        let userResponse = null;
+        
+        // Email formatında mı kontrol et
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (emailRegex.test(emailOrUyeNo)) {
+            // Email ile kullanıcı bilgilerini al
+            userResponse = await fetch(`${API_BASE_URL}/kullanicilar/email/${emailOrUyeNo}`, {
+                headers: getAuthHeaders()
+            });
+        } else {
+            // Üye numarası ile kullanıcı bilgilerini al
+            userResponse = await fetch(`${API_BASE_URL}/kullanicilar/uye-no/${emailOrUyeNo}`, {
+                headers: getAuthHeaders()
+            });
+        }
         
         if (!userResponse.ok) {
             throw new Error('Kullanıcı bilgileri alınamadı.');
         }
         
-        const userData = await userResponse.json();
+        userData = await userResponse.json();
         
         // Doğrulama başarılı, kullanıcıyı sisteme al
         currentUser = userData;
@@ -294,7 +307,7 @@ async function verifyUserLogin() {
 async function verifySavedSession(userId, email) {
     try {
         // Token ile kullanıcı bilgilerini al (email ile)
-        const response = await fetch(`${API_BASE_URL}/kullanici/email/${email}`, {
+        const response = await fetch(`${API_BASE_URL}/kullanicilar/email/${email}`, {
             headers: getAuthHeaders()
         });
         
@@ -848,7 +861,7 @@ async function updateUserInfo() {
             telefon: telefon || null
         };
         
-        const response = await fetch(`${API_BASE_URL}/kullanici/guncelle/${currentUserId}`, {
+        const response = await fetch(`${API_BASE_URL}/kullanicilar/guncelle/${currentUserId}`, {
             method: 'PUT',
             headers: getAuthHeaders(),
             body: JSON.stringify(updateData)

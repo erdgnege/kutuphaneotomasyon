@@ -14,6 +14,8 @@ document.getElementById('registerForm').addEventListener('submit', async functio
 async function registerUser() {
     const adSoyad = document.getElementById('adSoyadInput').value.trim();
     const email = document.getElementById('emailInput').value.trim();
+    const sifre = document.getElementById('sifreInput').value;
+    const sifreTekrar = document.getElementById('sifreTekrarInput').value;
     const telefon = document.getElementById('telefonInput').value.trim();
     const uyeNo = document.getElementById('uyeNoInput').value.trim();
     const alertEl = document.getElementById('registerAlert');
@@ -35,6 +37,22 @@ async function registerUser() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
         showAlert('Lütfen geçerli bir e-posta adresi giriniz.', 'warning', alertEl);
+        return;
+    }
+    
+    // Şifre validasyonu
+    if (!sifre) {
+        showAlert('Lütfen şifrenizi giriniz.', 'warning', alertEl);
+        return;
+    }
+    
+    if (sifre.length < 6) {
+        showAlert('Şifreniz en az 6 karakter olmalıdır.', 'warning', alertEl);
+        return;
+    }
+    
+    if (sifre !== sifreTekrar) {
+        showAlert('Şifreler eşleşmiyor. Lütfen tekrar kontrol ediniz.', 'warning', alertEl);
         return;
     }
     
@@ -80,6 +98,7 @@ async function registerUser() {
             dtype: 'UYE', // Jackson için tip bilgisi
             adSoyad: adSoyad,
             email: email,
+            sifre: sifre, // Şifre eklendi
             telefon: telefonTemiz, // Temizlenmiş telefon numarası (sadece rakamlar)
             uyeNo: uyeNo
         };

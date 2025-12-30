@@ -8,6 +8,6 @@ import java.util.Optional;
 @Repository
 public interface KitapRepository extends JpaRepository<Kitap, Long> {
 
-    // ISBN üzerinden kitap sorgulama (Benzersiz alan olduğu için önemli kanka)
+    // ISBN ile kitap sorgulama (Benzersiz alan)
     Optional<Kitap> findByIsbn(String isbn);
 }

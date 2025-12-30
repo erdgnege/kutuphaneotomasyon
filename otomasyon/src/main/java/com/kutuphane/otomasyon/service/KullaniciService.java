@@ -22,8 +22,7 @@ public class KullaniciService {
         this.kullaniciRepository = kullaniciRepository;
     }
 
-    // Polimorfizm budur kanka: Parametre olarak üst sınıfı (Kullanici) alırız,
-    // içine Uye de gelse Personel de gelse Java bunu kabul eder.
+    // Polimorfizm: Üst sınıf (Kullanici) parametre olarak kullanılır (Uye veya Personel kabul edilir)
     public Kullanici kullaniciKaydet(Kullanici kullanici) {
         // E-posta kontrolü (sadece başka bir kullanıcı tarafından kullanılıyorsa hata ver)
         if (kullanici.getEmail() != null) {

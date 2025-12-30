@@ -22,7 +22,7 @@ public class BildirimController {
         return ResponseEntity.ok(bildirimService.tumBildirimleriGetir());
     }
 
-    // 2. GENEL: Kaç tane okunmamış bildirim var? (Badge/Rozet için kanka)
+    // 2. GENEL: Okunmamış bildirim sayısı (Badge için)
     @GetMapping("/okunmamis-sayisi")
     public ResponseEntity<Long> getOkunmamisSayisi() {
         return ResponseEntity.ok(bildirimService.okunmamisBildirimSayisi());
@@ -32,13 +32,13 @@ public class BildirimController {
     @PostMapping("/oku/{id}")
     public ResponseEntity<?> bildirimOku(@PathVariable Long id) {
         bildirimService.bildirimiOkunduIsaretle(id);
-        return ResponseEntity.ok(Map.of("message", "Bildirim okundu kanka."));
+        return ResponseEntity.ok(Map.of("message", "Bildirim okundu."));
     }
 
-    // 4. GENEL: Hepsini okundu işaretle (Temizlik vakti brom)
+    // 4. GENEL: Tüm bildirimleri okundu işaretle
     @PostMapping("/hepsini-oku")
     public ResponseEntity<?> tumunuOku() {
         bildirimService.tumBildirimleriOkunduIsaretle();
-        return ResponseEntity.ok(Map.of("message", "Tüm bildirimler görüldü işaretlendi adaş."));
+        return ResponseEntity.ok(Map.of("message", "Tüm bildirimler okundu olarak işaretlendi."));
     }
 }

@@ -27,7 +27,7 @@ public class OduncController {
             @RequestParam Long kitapId,
             @RequestParam Long userId) {
 
-        // Personel yaptığı için bildirimOlustur'u true geçiyoruz kanka
+        // Personel işlemi için bildirim oluşturulacak
         return new ResponseEntity<>(oduncService.kitapOduncVer(userId, kitapId, true), HttpStatus.CREATED);
     }
 
@@ -44,8 +44,7 @@ public class OduncController {
     public ResponseEntity<Odunc> kullaniciKitapOduncIste(
             @RequestParam Long kitapId,
             @RequestParam Long userId) {
-        // Kanka burada userId'nin token'daki kişiyle aynı olduğunu kontrol eden
-        // bir mekanizma da eklenebilir ama şimdilik servise paslıyoruz.
+        // Not: userId'nin token'daki kullanıcıyla eşleştiği kontrol edilebilir
         Odunc odunc = oduncService.kitapOduncVer(userId, kitapId, true);
         return new ResponseEntity<>(odunc, HttpStatus.CREATED);
     }

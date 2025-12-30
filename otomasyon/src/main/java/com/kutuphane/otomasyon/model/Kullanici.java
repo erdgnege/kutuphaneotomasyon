@@ -12,7 +12,11 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import lombok.Getter;
+import lombok.Setter;
 
+@Getter
+@Setter
 @Entity
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 @Table(name = "kullanicilar")
@@ -22,8 +26,7 @@ import java.util.List;
         @JsonSubTypes.Type(value = Uye.class, name = "UYE"),
         @JsonSubTypes.Type(value = Personel.class, name = "PERSONEL")
 })
-// Kanka buraya UserDetails ekledik, Spring Security artık bu class'ın dilinden
-// anlayacak
+// UserDetails implementasyonu (Spring Security entegrasyonu)
 public abstract class Kullanici implements UserDetails {
 
     @Id
@@ -31,6 +34,7 @@ public abstract class Kullanici implements UserDetails {
     private Long id;
 
     @NotBlank(message = "İsim alanı boş bırakılamaz")
+
     @Column(name = "ad_soyad")
     private String adSoyad;
 
@@ -39,7 +43,7 @@ public abstract class Kullanici implements UserDetails {
     @Column(unique = true)
     private String email;
 
-    // Kanka burası çok kritik, şifre alanı ekledik!
+    // Şifre alanı (BCrypt ile encode edilir)
     @NotBlank(message = "Şifre zorunludur")
     private String sifre;
 
@@ -54,8 +58,7 @@ public abstract class Kullanici implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // Kanka burada dtype'a göre (UYE veya PERSONEL) yetki veriyoruz.
-        // Personel ise ADMIN, Uye ise USER rolü verelim mesela.
+        // dtype'a göre (UYE veya PERSONEL) yetki atanır
         String role = this.getClass().getSimpleName().toUpperCase();
         // Eğer Personel ise "ROLE_PERSONEL" döner. SecurityConfig'de
         // hasRole("PERSONEL") diyebilirsin.
@@ -69,7 +72,7 @@ public abstract class Kullanici implements UserDetails {
 
     @Override
     public String getUsername() {
-        return email; // Biz giriş yaparken email kullanacağız kanka
+        return email; // Kullanıcı adı olarak email kullanılır
     }
 
     @Override
@@ -105,52 +108,4 @@ public abstract class Kullanici implements UserDetails {
 
     public abstract int oduncAlmaLimitiHesapla();
 
-    // Getter & Setter
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getAdSoyad() {
-        return adSoyad;
-    }
-
-    public void setAdSoyad(String adSoyad) {
-        this.adSoyad = adSoyad;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public String getSifre() {
-        return sifre;
-    }
-
-    public void setSifre(String sifre) {
-        this.sifre = sifre;
-    }
-
-    public String getTelefon() {
-        return telefon;
-    }
-
-    public void setTelefon(String telefon) {
-        this.telefon = telefon;
-    }
-
-    public LocalDateTime getKayitTarihi() {
-        return kayitTarihi;
-    }
-
-    public void setKayitTarihi(LocalDateTime kayitTarihi) {
-        this.kayitTarihi = kayitTarihi;
-    }
 }

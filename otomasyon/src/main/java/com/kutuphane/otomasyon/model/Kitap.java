@@ -2,7 +2,11 @@ package com.kutuphane.otomasyon.model;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
+import lombok.Setter;
 
+@Getter
+@Setter
 @Entity
 @Table(name = "kitaplar")
 public class Kitap {
@@ -32,60 +36,11 @@ public class Kitap {
     public Kitap() {
     }
 
-    // Parametreli constructor (Kod yazarken işimizi kolaylaştırır aga)
+    // Parametreli constructor
     public Kitap(String baslik, String yazar, String isbn) {
         this.baslik = baslik;
         this.yazar = yazar;
         this.isbn = isbn;
     }
 
-    // --- Getter ve Setterlar ---
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getBaslik() {
-        return baslik;
-    }
-
-    public void setBaslik(String baslik) {
-        this.baslik = baslik;
-    }
-
-    public String getYazar() {
-        return yazar;
-    }
-
-    public void setYazar(String yazar) {
-        this.yazar = yazar;
-    }
-
-    public String getIsbn() {
-        return isbn;
-    }
-
-    public void setIsbn(String isbn) {
-        this.isbn = isbn;
-    }
-
-    public boolean isMevcut() {
-        return mevcut;
-    }
-
-    public void setMevcut(boolean mevcut) {
-        this.mevcut = mevcut;
-    }
-
-    public String getKapakUrl() {
-        return kapakUrl;
-    }
-
-    public void setKapakUrl(String kapakUrl) {
-        this.kapakUrl = kapakUrl;
-    }
 }

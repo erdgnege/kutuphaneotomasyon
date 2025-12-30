@@ -34,7 +34,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain) throws ServletException, IOException {
 
-        // 1. Header'dan "Authorization" kısmını çekiyoruz kanka
+        // Authorization header'ından token alınır
         final String authHeader = request.getHeader("Authorization");
         final String jwt;
         final String userEmail;
@@ -47,7 +47,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // 3. "Bearer " kısmını atıp gerçek token'ı alıyoruz
         jwt = authHeader.substring(7);
-        userEmail = jwtService.extractUsername(jwt); // JwtService'i burada kullanıyoruz adaş
+        userEmail = jwtService.extractUsername(jwt);
 
         // 4. Username varsa ve kullanıcı henüz authenticate edilmemişse (SecurityContext boşsa)
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -84,11 +84,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
                             null,
-                            userDetails.getAuthorities() // Roller (UYE/PERSONEL) burada atanıyor brom
+                            userDetails.getAuthorities() // Roller (UYE/PERSONEL) atanır
                     );
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                    // 6. Artık SecurityContext'e bu arkadaşı ekliyoruz, kapılar ona açılıyor
+                    // SecurityContext'e authentication token'ı eklenir
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }

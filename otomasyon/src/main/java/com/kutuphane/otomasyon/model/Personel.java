@@ -1,7 +1,11 @@
 package com.kutuphane.otomasyon.model;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
+@Getter
+@Setter
 @Entity
 @DiscriminatorValue("PERSONEL")
 public class Personel extends Kullanici {
@@ -11,12 +15,12 @@ public class Personel extends Kullanici {
 
     private String departman;
 
-    // Boş constructor kanka, JPA için şart
+    // Boş constructor (JPA için gerekli)
     public Personel() {
         super();
     }
 
-    // Kanka buraya 'sifre' parametresini ekledik ve super'e gönderdik
+    // Parametreli constructor (şifre super class'a gönderilir)
     public Personel(String adSoyad, String email, String sifre, String sicilNo, String departman) {
         super(adSoyad, email, sifre);
         this.sicilNo = sicilNo;
@@ -26,24 +30,7 @@ public class Personel extends Kullanici {
     // Personel için ödünç limiti
     @Override
     public int oduncAlmaLimitiHesapla() {
-        return 10; // Kanka istersen personelin limitini biraz artırabilirsin :)
+        return 10; // Personel ödünç alma limiti
     }
 
-    // --- Getter ve Setterlar ---
-
-    public String getSicilNo() {
-        return sicilNo;
-    }
-
-    public void setSicilNo(String sicilNo) {
-        this.sicilNo = sicilNo;
-    }
-
-    public String getDepartman() {
-        return departman;
-    }
-
-    public void setDepartman(String departman) {
-        this.departman = departman;
-    }
 }

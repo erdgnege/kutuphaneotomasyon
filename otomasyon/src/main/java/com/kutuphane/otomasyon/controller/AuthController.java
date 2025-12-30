@@ -30,7 +30,7 @@ public class AuthController {
     @PostMapping("/kod-iste")
     public ResponseEntity<?> kodGonder(@RequestParam String email) {
         verificationService.generateAndSendCode(email);
-        return ResponseEntity.ok(Map.of("message", "Doğrulama kodu e-postanıza gönderildi kanka."));
+        return ResponseEntity.ok(Map.of("message", "Doğrulama kodu e-postanıza gönderildi."));
     }
 
     // 2. ADIM: Kayıt Ol (Uye olarak)
@@ -39,18 +39,18 @@ public class AuthController {
             @RequestBody Uye uye,
             @RequestParam String kod) {
 
-        // Kanka önce kod doğru mu diye bakıyoruz
+        // Doğrulama kodu kontrolü
         if (!verificationService.verifyCode(uye.getEmail(), kod)) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Kod hatalı veya süresi dolmuş brom!"));
+            return ResponseEntity.badRequest().body(Map.of("message", "Kod hatalı veya süresi dolmuş!"));
         }
 
-        // Şifreyi BCrypt ile şifrelemeden kaydetmiyoruz adaş, güvenlik şart!
+        // Şifre BCrypt ile encode edilir
         uye.setSifre(passwordEncoder.encode(uye.getSifre()));
 
         kullaniciService.kullaniciKaydet(uye);
         verificationService.clearCode(uye.getEmail()); // Kayıt bitince kodu temizle
 
-        return ResponseEntity.ok(Map.of("message", "Kayıt başarıyla tamamlandı kardeşim. Giriş yapabilirsin."));
+        return ResponseEntity.ok(Map.of("message", "Kayıt başarıyla tamamlandı. Giriş yapabilirsiniz."));
     }
 
     // 3. ADIM: Giriş Yap (Token Al)

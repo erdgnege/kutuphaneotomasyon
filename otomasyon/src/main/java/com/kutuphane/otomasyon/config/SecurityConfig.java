@@ -27,7 +27,7 @@ public class SecurityConfig {
         public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
                 http
                                 .cors(cors -> cors.configurationSource(corsConfigurationSource())) // CORS ayarları
-                                .csrf(csrf -> csrf.disable()) // API projelerinde kanka csrf'i kapatıyoruz
+                                .csrf(csrf -> csrf.disable()) // API projelerinde CSRF devre dışı
                                 .authorizeHttpRequests(auth -> auth
                                                 // 1. Herkese açık olan yollar
                                                 .requestMatchers("/api/auth/**").permitAll()
@@ -35,10 +35,13 @@ public class SecurityConfig {
                                                                                                               // herkes
                                                                                                               // görebilir
                                                                                                               // (GET)
-                                                .requestMatchers("/api/kullanici/uye-no/**").permitAll() // Üye numarası
+                                                .requestMatchers("/api/kullanicilar/uye-no/**").permitAll() // Üye numarası
                                                                                                          // ile arama
                                                                                                          // (login için)
-                                                .requestMatchers("/api/kullanici/email/**").authenticated() // Email ile
+                                                .requestMatchers("/api/kullanicilar/email/kod-gonder").permitAll() // Email doğrulama kodu gönderme (kayıt için)
+                                                .requestMatchers("/api/kullanicilar/email/kod-dogrula").permitAll() // Email doğrulama kodu doğrulama (kayıt için)
+                                                .requestMatchers("/api/kullanicilar/uye").permitAll() // Yeni üye kaydı
+                                                .requestMatchers("/api/kullanicilar/email/**").authenticated() // Email ile
                                                                                                             // kullanıcı
                                                                                                             // bulma
                                                                                                             // (token
@@ -70,16 +73,16 @@ public class SecurityConfig {
                                                                                                                   // işlem
                                                                                                                   // loglarını
                                                                                                                   // görebilir
-                                                .requestMatchers("/api/kullanici/hepsi").hasRole("ADMIN") // Admin tüm
+                                                .requestMatchers("/api/kullanicilar/hepsi").hasRole("ADMIN") // Admin tüm
                                                                                                           // kullanıcıları
                                                                                                           // görebilir
-                                                .requestMatchers("/api/kullanici/uyeler").hasRole("ADMIN") // Admin tüm
+                                                .requestMatchers("/api/kullanicilar/uyeler").hasRole("ADMIN") // Admin tüm
                                                                                                            // üyeleri
                                                                                                            // görebilir
-                                                .requestMatchers("/api/kullanici/sil/**").hasRole("ADMIN") // Admin
+                                                .requestMatchers("/api/kullanicilar/sil/**").hasRole("ADMIN") // Admin
                                                                                                            // kullanıcı
                                                                                                            // silebilir
-                                                .requestMatchers("/api/kullanici/tip-degistir/**").hasRole("ADMIN") // Admin
+                                                .requestMatchers("/api/kullanicilar/tip-degistir/**").hasRole("ADMIN") // Admin
                                                                                                                     // kullanıcı
                                                                                                                     // tipini
                                                                                                                     // değiştirebilir
@@ -98,7 +101,7 @@ public class SecurityConfig {
 
                                                 // 4. Geri kalan her şey için giriş yapmış olmak şart
                                                 .anyRequest().authenticated())
-                                // Session tutmuyoruz kanka, her şey JWT üzerinden dönecek (Stateless)
+                                // Stateless: Session yok, JWT tabanlı kimlik doğrulama
                                 .sessionManagement(session -> session
                                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                                 .authenticationProvider(authenticationProvider)

@@ -17,9 +17,8 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
-    // Kanka bu secret key senin imzan. Gerçek projede bunu application.properties
-    // içine sakla.
-    // En az 256-bit bir anahtar olmalı.
+    // Secret key: JWT imzalama için kullanılır
+    // Not: Production'da application.properties'den alınmalı (en az 256-bit)
     private static final String SECRET_KEY = "68746172206B616E6B6120627520636F6B206775636C7520626972206B6579206F6C6D616C69";
 
     // Token içinden kullanıcı adını (subject) çekiyoruz

@@ -181,45 +181,89 @@
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
-                                <!-- Google Books Arama Bölümü -->
-                                <div class="mb-3 p-3 border rounded bg-light">
-                                    <label class="form-label fw-bold">
-                                        <i class="bi bi-search"></i> Google Books'tan Ara
-                                    </label>
-                                    <div class="input-group mb-2">
-                                        <input type="text" class="form-control" id="googleBookSearch" placeholder="ISBN veya kitap adı ile ara...">
-                                        <button class="btn btn-outline-primary" type="button" onclick="searchGoogleBooks()">
-                                            <i class="bi bi-search"></i> Ara
+                                <!-- Sekmeler -->
+                                <ul class="nav nav-tabs mb-3" id="addBookTabs" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual-pane" type="button" role="tab" aria-controls="manual-pane" aria-selected="true">
+                                            <i class="bi bi-pencil-square"></i> Manuel Ekleme
                                         </button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="google-tab" data-bs-toggle="tab" data-bs-target="#google-pane" type="button" role="tab" aria-controls="google-pane" aria-selected="false">
+                                            <i class="bi bi-search"></i> Google Books'tan Ekleme
+                                        </button>
+                                    </li>
+                                </ul>
+                                
+                                <!-- Sekme İçerikleri -->
+                                <div class="tab-content" id="addBookTabContent">
+                                    <!-- Manuel Ekleme Sekmesi -->
+                                    <div class="tab-pane fade show active" id="manual-pane" role="tabpanel" aria-labelledby="manual-tab">
+                                        <form id="addBookForm">
+                                            <div class="mb-3">
+                                                <label for="bookBaslik" class="form-label">Kitap Adı <span class="text-danger">*</span></label>
+                                                <input type="text" class="form-control" id="bookBaslik" placeholder="Kitap adını giriniz" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="bookYazar" class="form-label">Yazar <span class="text-danger">*</span></label>
+                                                <input type="text" class="form-control" id="bookYazar" placeholder="Yazar adını giriniz" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="bookIsbn" class="form-label">ISBN <span class="text-danger">*</span></label>
+                                                <input type="text" class="form-control" id="bookIsbn" placeholder="ISBN numarasını giriniz" required>
+                                                <small class="form-text text-muted">ISBN numarası benzersiz olmalıdır</small>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="bookKapakUrl" class="form-label">Kitap Kapağı URL (Opsiyonel)</label>
+                                                <input type="url" class="form-control" id="bookKapakUrl" placeholder="Kitap kapağı URL'i">
+                                                <small class="form-text text-muted">Kitap kapağı görselinin URL'i</small>
+                                            </div>
+                                        </form>
                                     </div>
-                                    <div id="googleBooksResults" class="mt-2" style="display: none;">
-                                        <!-- Arama sonuçları buraya gelecek -->
+                                    
+                                    <!-- Google Books'tan Ekleme Sekmesi -->
+                                    <div class="tab-pane fade" id="google-pane" role="tabpanel" aria-labelledby="google-tab">
+                                        <div class="mb-3">
+                                            <label class="form-label fw-bold">
+                                                <i class="bi bi-search"></i> Google Books'tan Ara
+                                            </label>
+                                            <div class="input-group mb-3">
+                                                <input type="text" class="form-control" id="googleBookSearch" placeholder="ISBN, kitap adı veya yazar ile ara..." onkeypress="if(event.key === 'Enter') searchGoogleBooks()">
+                                                <button class="btn btn-outline-primary" type="button" onclick="searchGoogleBooks()">
+                                                    <i class="bi bi-search"></i> Ara
+                                                </button>
+                                            </div>
+                                            <div id="googleBooksResults" class="mt-2" style="display: none;">
+                                                <!-- Arama sonuçları buraya gelecek -->
+                                            </div>
+                                        </div>
+                                        
+                                        <hr>
+                                        
+                                        <form id="addBookFormGoogle">
+                                            <div class="mb-3">
+                                                <label for="bookBaslikGoogle" class="form-label">Kitap Adı <span class="text-danger">*</span></label>
+                                                <input type="text" class="form-control" id="bookBaslikGoogle" placeholder="Google Books'tan seçin veya manuel girin" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="bookYazarGoogle" class="form-label">Yazar <span class="text-danger">*</span></label>
+                                                <input type="text" class="form-control" id="bookYazarGoogle" placeholder="Google Books'tan seçin veya manuel girin" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="bookIsbnGoogle" class="form-label">ISBN <span class="text-danger">*</span></label>
+                                                <input type="text" class="form-control" id="bookIsbnGoogle" placeholder="Google Books'tan seçin veya manuel girin" required>
+                                                <small class="form-text text-muted">ISBN numarası benzersiz olmalıdır</small>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="bookKapakUrlGoogle" class="form-label">Kitap Kapağı URL (Opsiyonel)</label>
+                                                <input type="url" class="form-control" id="bookKapakUrlGoogle" placeholder="Google Books'tan seçildiğinde otomatik doldurulur">
+                                                <small class="form-text text-muted">Google Books'tan seçildiğinde otomatik doldurulur</small>
+                                            </div>
+                                        </form>
                                     </div>
                                 </div>
                                 
-                                <hr>
-                                
-                                <form id="addBookForm">
-                                    <div class="mb-3">
-                                        <label for="bookBaslik" class="form-label">Kitap Adı <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" id="bookBaslik" placeholder="Kitap adını giriniz" required>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="bookYazar" class="form-label">Yazar <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" id="bookYazar" placeholder="Yazar adını giriniz" required>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="bookIsbn" class="form-label">ISBN <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" id="bookIsbn" placeholder="ISBN numarasını giriniz" required onkeypress="if(event.key === 'Enter') searchGoogleBooks()">
-                                        <small class="form-text text-muted">ISBN numarası benzersiz olmalıdır</small>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="bookKapakUrl" class="form-label">Kitap Kapağı URL (Opsiyonel)</label>
-                                        <input type="url" class="form-control" id="bookKapakUrl" placeholder="Kitap kapağı URL'i">
-                                        <small class="form-text text-muted">Google Books'tan seçildiğinde otomatik doldurulur</small>
-                                    </div>
-                                    <div id="addBookAlert" class="alert d-none" role="alert"></div>
-                                </form>
+                                <div id="addBookAlert" class="alert d-none mt-3" role="alert"></div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>

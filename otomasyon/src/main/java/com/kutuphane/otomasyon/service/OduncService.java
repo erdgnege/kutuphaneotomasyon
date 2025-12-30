@@ -52,7 +52,7 @@ public class OduncService {
         }
 
         if (!kitap.isMevcut()) {
-            throw new KutuphaneHatasi("Bu kitap şu an başkasında kanka, mevcut değil.");
+            throw new KutuphaneHatasi("Bu kitap şu an başkasında, mevcut değil.");
         }
 
         // 3. Kitabı güncelle ve Ödünç kaydını oluştur

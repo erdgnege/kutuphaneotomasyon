@@ -1,10 +1,14 @@
 package com.kutuphane.otomasyon.model;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
+@Getter
+@Setter
 @Table(name = "islem_loglari")
 public class IslemLog {
 
@@ -54,62 +58,4 @@ public class IslemLog {
         KITAP_SIL
     }
 
-    // --- Getter ve Setterlar ---
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public IslemTipi getIslemTipi() {
-        return islemTipi;
-    }
-
-    public void setIslemTipi(IslemTipi islemTipi) {
-        this.islemTipi = islemTipi;
-    }
-
-    public Kitap getKitap() {
-        return kitap;
-    }
-
-    public void setKitap(Kitap kitap) {
-        this.kitap = kitap;
-    }
-
-    public String getKitapBaslik() {
-        return kitapBaslik;
-    }
-
-    public void setKitapBaslik(String kitapBaslik) {
-        this.kitapBaslik = kitapBaslik;
-    }
-
-    public String getKitapIsbn() {
-        return kitapIsbn;
-    }
-
-    public void setKitapIsbn(String kitapIsbn) {
-        this.kitapIsbn = kitapIsbn;
-    }
-
-    public String getKitapYazar() {
-        return kitapYazar;
-    }
-
-    public void setKitapYazar(String kitapYazar) {
-        this.kitapYazar = kitapYazar;
-    }
-
-    public LocalDateTime getIslemTarihi() {
-        return islemTarihi;
-    }
-
-    public void setIslemTarihi(LocalDateTime islemTarihi) {
-        this.islemTarihi = islemTarihi;
-    }
 }
-

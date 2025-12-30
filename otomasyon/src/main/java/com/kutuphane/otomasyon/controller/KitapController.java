@@ -13,7 +13,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/kitap")
-@RequiredArgsConstructor // Kanka constructor injection'ı Lombok ile hallediyoruz
+@RequiredArgsConstructor // Lombok ile constructor injection
 public class KitapController {
 
     private final KitapService kitapService;
@@ -34,7 +34,7 @@ public class KitapController {
     @PostMapping("/ekle")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Kitap> kitapEkle(@Valid @RequestBody Kitap kitap) {
-        // Eğer kapakUrl boş gelirse varsayılan bir görsel set edebilirsin kanka
+        // KapakUrl boş ise varsayılan görsel kullanılır
         if (kitap.getKapakUrl() == null || kitap.getKapakUrl().isEmpty()) {
             kitap.setKapakUrl("https://via.placeholder.com/150?text=Kitap+Kapagi");
         }
@@ -46,7 +46,7 @@ public class KitapController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> kitapSil(@PathVariable Long id) {
         kitapService.kitapSil(id);
-        return ResponseEntity.ok(Map.of("message", "Kitap başarıyla silindi kanka."));
+        return ResponseEntity.ok(Map.of("message", "Kitap başarıyla silindi."));
     }
 
     // 5. SADECE ADMIN: Kitap bilgilerini güncelle
@@ -59,8 +59,7 @@ public class KitapController {
         mevcutKitap.setYazar(yeniKitap.getYazar());
         mevcutKitap.setIsbn(yeniKitap.getIsbn());
         mevcutKitap.setKapakUrl(yeniKitap.getKapakUrl());
-        // Mevcut durumunu (ödünçte mi değil mi) elle değiştirtmiyoruz,
-        // onu OduncService hallediyor kanka.
+        // Kitap durumu (mevcut/ödünçte) OduncService tarafından yönetilir
 
         return ResponseEntity.ok(kitapService.kitapEkle(mevcutKitap));
     }

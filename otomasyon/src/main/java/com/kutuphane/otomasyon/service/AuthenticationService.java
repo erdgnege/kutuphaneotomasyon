@@ -14,37 +14,44 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class AuthenticationService {
 
-    private final KullaniciRepository repository;
-    private final JwtService jwtService;
-    private final AuthenticationManager authenticationManager;
+        private final KullaniciRepository repository;
+        private final JwtService jwtService;
+        private final AuthenticationManager authenticationManager;
 
-    /**
-     * Kullanıcı girişi (Login) işlemini yapar.
-     * * @param request Kullanıcının girdiği email ve şifre
-     * 
-     * @return Token içeren yanıt
-     */
-    public AuthResponse authenticate(AuthRequest request) {
+        public AuthResponse authenticate(AuthRequest request) {
+                Kullanici user = null;
+                String username = request.getEmail(); // Email alanı email veya üye no içerebilir
 
-        // 1. Spring Security'nin kendi mekanizmasıyla şifre kontrolü yapıyoruz.
-        // Eğer şifre yanlışsa veya kullanıcı yoksa burada otomatik hata fırlatır
-        // (BadCredentialsException).
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
-                        request.getPassword()));
+                // 1. Email veya üye numarası ile kullanıcıyı bul
+                // Önce email formatında mı kontrol et
+                if (username.contains("@")) {
+                        // Email ile kullanıcı bul
+                        user = repository.findByEmail(username)
+                                        .orElse(null);
+                } else {
+                        // Üye numarası ile kullanıcı bul (sadece Uye olabilir)
+                        user = repository.findByUyeNo(username)
+                                        .orElse(null);
+                }
 
-        // 2. Giriş başarılıysa, token üretmek için kullanıcının detaylarını
-        // veritabanından çekiyoruz.
-        Kullanici user = repository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new UsernameNotFoundException("Kullanıcı bulunamadı!"));
+                if (user == null) {
+                        throw new UsernameNotFoundException("Kullanıcı bulunamadı!");
+                }
 
-        // 3. Token üretiyoruz
-        String jwtToken = jwtService.generateToken(user);
+                // 2. Spring Security'nin kendi mekanizmasıyla şifre kontrolü yapıyoruz.
+                // Kullanıcının email'ini username olarak kullanıyoruz (Spring Security email
+                // ile çalışır)
+                authenticationManager.authenticate(
+                                new UsernamePasswordAuthenticationToken(
+                                                user.getEmail(), // Spring Security için email kullanılmalı
+                                                request.getPassword()));
 
-        // 4. Token'ı paketleyip dönüyoruz (Lombok @Builder kullanarak)
-        return AuthResponse.builder()
-                .token(jwtToken)
-                .build();
-    }
+                // 3. Token üretiyoruz
+                String jwtToken = jwtService.generateToken(user);
+
+                // 4. Token'ı paketleyip dönüyoruz (Lombok @Builder kullanarak)
+                return AuthResponse.builder()
+                                .token(jwtToken)
+                                .build();
+        }
 }

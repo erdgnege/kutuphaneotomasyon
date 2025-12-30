@@ -45,7 +45,7 @@ public class KitapService {
     // Kitabı sil
     @Transactional
     public void kitapSil(Long id) {
-        // Silmeden önce var mı diye kontrol edelim ki patlamasın kanka
+        // Varlık kontrolü: Silme işlemi öncesi kontrol
         if (!kitapRepository.existsById(id)) {
             throw new KutuphaneHatasi("Silinmek istenen kitap zaten yok!");
         }

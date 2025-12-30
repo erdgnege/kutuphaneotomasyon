@@ -18,7 +18,7 @@ public class EmailService {
                        @Value("${spring.mail.username:}") String fromEmail,
                        @Value("${app.email.enabled:false}") boolean emailEnabled) {
         this.mailSender = mailSender;
-        this.fromEmail = fromEmail;
+        this.fromEmail = fromEmail != null && !fromEmail.isEmpty() ? fromEmail : "noreply@kutuphane.com";
         this.emailEnabled = emailEnabled;
     }
     
@@ -76,6 +76,7 @@ public class EmailService {
             System.out.println("E-posta: " + toEmail);
             System.out.println("Doğrulama Kodu: " + code);
             System.out.println("Bu kod 10 dakika geçerlidir.");
+            System.out.println("Hata: " + e.getMessage());
             System.out.println("========================================");
         }
     }
@@ -134,6 +135,7 @@ public class EmailService {
             System.out.println("E-posta: " + toEmail);
             System.out.println("Şifre Sıfırlama Kodu: " + code);
             System.out.println("Bu kod 15 dakika geçerlidir.");
+            System.out.println("Hata: " + e.getMessage());
             System.out.println("========================================");
         }
     }

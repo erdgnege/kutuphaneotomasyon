@@ -77,6 +77,16 @@
                             <div id="codeStatus" class="mt-2"></div>
                         </div>
                         <div class="mb-3">
+                            <label for="sifreInput" class="form-label">Şifre <span class="text-danger">*</span></label>
+                            <input type="password" class="form-control" id="sifreInput" placeholder="Şifrenizi giriniz" required minlength="6">
+                            <small class="form-text text-muted">Şifreniz en az 6 karakter olmalıdır</small>
+                        </div>
+                        <div class="mb-3">
+                            <label for="sifreTekrarInput" class="form-label">Şifre Tekrar <span class="text-danger">*</span></label>
+                            <input type="password" class="form-control" id="sifreTekrarInput" placeholder="Şifrenizi tekrar giriniz" required minlength="6">
+                            <small class="form-text text-muted">Şifrenizi doğrulamak için tekrar giriniz</small>
+                        </div>
+                        <div class="mb-3">
                             <label for="telefonInput" class="form-label">Telefon <span class="text-danger">*</span></label>
                             <input type="tel" class="form-control" id="telefonInput" placeholder="05551234567" required maxlength="11" pattern="[0-9]{11}">
                             <small class="form-text text-muted">11 haneli telefon numaranızı giriniz (örn: 05551234567)</small>
